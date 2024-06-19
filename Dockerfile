@@ -1,4 +1,4 @@
-FROM openjdk:21 as builder
+FROM openjdk as builder
 
 WORKDIR application
 ARG JAR_FILE=application/build/libs/*.jar
@@ -7,7 +7,7 @@ RUN java -Djarmode=layertools -jar application.jar extract
 
 ################################
 
-FROM  openjdk:21
+FROM  openjdk
 LABEL maintainer="Diandoricon <diandoricon@gmail.com>"
 WORKDIR application
 COPY --from=builder application/dependencies/ ./
