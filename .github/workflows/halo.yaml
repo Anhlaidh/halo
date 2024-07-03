@@ -75,24 +75,19 @@ jobs:
         with:
           name: halo-artifacts
           path: application/build/libs
-      - name: Docker Buildx and Push
-        uses: ./.github/actions/docker-buildx-push
-        with:
-          image-name: ${{ github.event_name == 'release' && 'halo' || 'halo-dev' }}
-          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
-          dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
-          dockerhub-token: ${{ secrets.DOCKER_TOKEN }}
-          push: true
-          platforms: linux/amd64,linux/arm64/v8,linux/ppc64le,linux/s390x
-      - name: Log in to Docker Hub
+      - name: Log in to Aliyun Docker Registry
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_TOKEN }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD registry.cn-hongkong.aliyuncs.com
-      - name: Tag Docker image
-        run: docker tag [ImageId] registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
+      - name: Docker Build and Tag
+        run: |
+          docker build . -t registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
+          docker tag registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:${{ github.sha }}
       - name: Push Docker image
-        run: docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
+        run: |
+          docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
+          docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:${{ github.sha }}
 
   e2e-test:
     if: always() && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'push')
