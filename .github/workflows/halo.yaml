@@ -100,6 +100,15 @@ jobs:
           dockerhub-token: ${{ secrets.DOCKER_TOKEN }}
           push: true
           platforms: linux/amd64,linux/arm64/v8,linux/ppc64le,linux/s390x
+      - name: Log in to Docker Hub
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD registry.cn-hongkong.aliyuncs.com
+      - name: Tag Docker image
+        run: docker tag [ImageId] registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
+      - name: Push Docker image
+        run: docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
 
   e2e-test:
     if: always() && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'push')
