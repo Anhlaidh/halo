@@ -1,12 +1,14 @@
 import {
+  Editor,
+  Extension,
+  isList,
   type CommandProps,
   type Extensions,
   type KeyboardShortcutCommand,
-  Extension,
-  isList,
-  CoreEditor,
 } from "@/tiptap";
 import { TextSelection, Transaction } from "@/tiptap/pm";
+import type { ExtensionOptions } from "@/types";
+import { isListActive } from "@/utils/is-list-active";
 
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
@@ -23,10 +25,13 @@ type IndentOptions = {
   minIndentLevel: number;
   maxIndentLevel: number;
   defaultIndentLevel: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   HTMLAttributes: Record<string, any>;
+  firstLineIndent: boolean;
 };
-const Indent = Extension.create<IndentOptions, never>({
+const Indent = Extension.create<IndentOptions & ExtensionOptions>({
   name: "indent",
+  priority: 10000,
 
   addOptions() {
     return {
@@ -36,6 +41,7 @@ const Indent = Extension.create<IndentOptions, never>({
       maxIndentLevel: 24 * 10,
       defaultIndentLevel: 0,
       HTMLAttributes: {},
+      firstLineIndent: true,
     };
   },
 
@@ -55,6 +61,13 @@ const Indent = Extension.create<IndentOptions, never>({
             parseHTML: (element) =>
               parseInt(element.style.marginLeft, 10) ||
               this.options.defaultIndentLevel,
+          },
+          lineIndent: {
+            default: false,
+            renderHTML: (attributes) => ({
+              style: attributes.lineIndent ? "text-indent: 2em" : "",
+            }),
+            parseHTML: (element) => element.style.textIndent === "2em",
           },
         },
       },
@@ -76,9 +89,8 @@ const Indent = Extension.create<IndentOptions, never>({
           );
           if (tr.docChanged && dispatch) {
             dispatch(tr);
-            return true;
           }
-          return false;
+          return true;
         },
       outdent:
         () =>
@@ -93,9 +105,8 @@ const Indent = Extension.create<IndentOptions, never>({
           );
           if (tr.docChanged && dispatch) {
             dispatch(tr);
-            return true;
           }
-          return false;
+          return true;
         },
     };
   },
@@ -106,6 +117,28 @@ const Indent = Extension.create<IndentOptions, never>({
       "Shift-Tab": getOutdent(false),
       "Mod-]": getIndent(),
       "Mod-[": getOutdent(false),
+      Backspace: ({ editor }) => {
+        const { selection } = editor.state;
+        const { $from } = selection;
+
+        if ($from.parentOffset === 0) {
+          const node = $from.parent;
+
+          if (node.attrs.lineIndent) {
+            return editor
+              .chain()
+              .focus()
+              .updateAttributes(node.type.name, { lineIndent: false })
+              .run();
+          }
+
+          if (node.attrs.indent && node.attrs.indent > 0) {
+            return getOutdent(false)({ editor });
+          }
+        }
+
+        return false;
+      },
     };
   },
 
@@ -133,21 +166,47 @@ export const clamp = (val: number, min: number, max: number): number => {
 function setNodeIndentMarkup(
   tr: Transaction,
   pos: number,
-  delta: number,
-  min: number,
-  max: number
+  dir: number,
+  options: IndentOptions
 ): Transaction {
-  if (!tr.doc) return tr;
+  if (!tr.doc) {
+    return tr;
+  }
   const node = tr.doc.nodeAt(pos);
-  if (!node) return tr;
+  if (!node) {
+    return tr;
+  }
+  if (options.firstLineIndent && isLineIndent(tr)) {
+    if (node.attrs.lineIndent !== dir > 0) {
+      const nodeAttrs = { ...node.attrs, lineIndent: dir > 0 };
+      return tr.setNodeMarkup(pos, node.type, nodeAttrs, node.marks);
+    }
+  }
+
+  const delta = options.indentRange * dir;
+  const min = options.minIndentLevel;
+  const max = options.maxIndentLevel;
   const indent = clamp((node.attrs.indent || 0) + delta, min, max);
-  if (indent === node.attrs.indent) return tr;
-  const nodeAttrs = {
-    ...node.attrs,
-    indent,
-  };
+  if (indent === node.attrs.indent) {
+    return tr;
+  }
+  const nodeAttrs = { ...node.attrs, indent };
   return tr.setNodeMarkup(pos, node.type, nodeAttrs, node.marks);
 }
+
+const isLineIndent = (tr: Transaction) => {
+  const { selection } = tr;
+  const { $from, from, to } = selection;
+  if (from == 0) {
+    return true;
+  }
+
+  if (from != to) {
+    return false;
+  }
+
+  return $from.textOffset == 0;
+};
 
 type IndentType = "indent" | "outdent";
 const updateIndentLevel = (
@@ -167,13 +226,7 @@ const updateIndentLevel = (
       if (isTextIndent(tr, pos) && type === "indent") {
         tr.insertText("\t", from, to);
       } else {
-        tr = setNodeIndentMarkup(
-          tr,
-          pos,
-          options.indentRange * (type === "indent" ? 1 : -1),
-          options.minIndentLevel,
-          options.maxIndentLevel
-        );
+        tr = setNodeIndentMarkup(tr, pos, type === "indent" ? 1 : -1, options);
       }
       return false;
     }
@@ -195,26 +248,16 @@ const isTextIndent = (tr: Transaction, currNodePos: number) => {
   return false;
 };
 
-const isListActive = (editor: CoreEditor) => {
-  return (
-    editor.isActive("bulletList") ||
-    editor.isActive("orderedList") ||
-    editor.isActive("taskList")
-  );
-};
-
-const isFilterActive = (editor: CoreEditor) => {
+const isFilterActive = (editor: Editor) => {
   return editor.isActive("table") || editor.isActive("columns");
 };
 
 export const getIndent: () => KeyboardShortcutCommand =
   () =>
   ({ editor }) => {
-    // @ts-ignore
     if (isFilterActive(editor)) {
       return false;
     }
-    // @ts-ignore
     if (isListActive(editor)) {
       const name = editor.can().sinkListItem("listItem")
         ? "listItem"

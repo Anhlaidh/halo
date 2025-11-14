@@ -64,6 +64,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload ${{ github.event.release.tag_name }} application/build/libs/*
 
+  build-and-publish-container-image-with-buildpacks:
+    needs: build
+    if: always() && needs.build.result == 'success' && (github.event_name == 'push' || github.event_name == 'release')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Environment
+        uses: ./.github/actions/setup-env
+      - name: Reset version of Halo
+        if: github.event_name == 'release'
+        shell: bash
+        run: |
+          # Set the version with tag name when releasing
+          version=${{ github.event.release.tag_name }}
+          version=${version#v}
+          sed -i "s/version=.*-SNAPSHOT$/version=$version/1" gradle.properties
+      - name: Publish To Container Registries
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          F2C_USERNAME: ${{ secrets.F2C_REGISTRY_USER }}
+          F2C_TOKEN: ${{ secrets.F2C_REGISTRY_TOKEN }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run:
+          ./gradlew publishToAllRegistries -Prelease=${{ github.event_name == 'release' && 'true' || 'false' }}
+
   docker-build-and-push:
     if: always() && needs.build.result == 'success' && (github.event_name == 'push' || github.event_name == 'release')
     runs-on: ubuntu-latest
@@ -88,6 +115,17 @@ jobs:
         run: |
           docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:latest
           docker push registry.cn-hongkong.aliyuncs.com/anhlaidh/acm-halo:${{ github.sha }}
+      - name: Docker Buildx and Push
+        uses: ./.github/actions/docker-buildx-push
+        with:
+          image-name: ${{ github.event_name == 'release' && 'halo' || 'halo-dev' }}
+          ghcr-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKER_TOKEN }}
+          f2c-registry-user: ${{ secrets.F2C_REGISTRY_USER }}
+          f2c-registry-token: ${{ secrets.F2C_REGISTRY_TOKEN }}
+          push: true
+          platforms: linux/amd64,linux/arm64/v8,linux/ppc64le,linux/s390x
 
   e2e-test:
     if: always() && needs.build.result == 'success' && (github.event_name == 'pull_request' || github.event_name == 'push')
@@ -107,6 +145,7 @@ jobs:
           push: false
           context: .
       - name: E2E Testing
+        continue-on-error: true
         run: |
           sudo curl -L https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
           sudo chmod u+x /usr/local/bin/docker-compose

@@ -171,7 +171,7 @@ kind: ReasonType
 metadata:
   name: email-verification
   labels:
-    halo.run/hide: "true"
+    halo.run/hidden: "true"
 spec:
   displayName: "邮箱验证"
   description: "当你的邮箱被用于注册账户时，会收到一条带有验证码的邮件，你需要点击邮件中的链接来验证邮箱是否属于你。"
@@ -191,7 +191,7 @@ kind: ReasonType
 metadata:
   name: reset-password-by-email
   labels:
-    halo.run/hide: "true"
+    halo.run/hidden: "true"
 spec:
   displayName: "根据邮件地址重置密码"
   description: "当你通过邮件地址找回密码时，会收到一条带密码重置链接的邮件，你需要点击邮件中的链接来重置密码。"
@@ -205,3 +205,27 @@ spec:
     - name: expirationAtMinutes
       type: string
       description: "The expiration minutes of the reset link, such as 30 minutes."
+---
+apiVersion: notification.halo.run/v1alpha1
+kind: ReasonType
+metadata:
+  name: new-device-login
+spec:
+  displayName: "新设备登录"
+  description: "当你的账户在新设备上登录时，你会收到一条通知，告诉你有新设备登录了你的账户。"
+  properties:
+    - name: os
+      type: string
+      description: "The operating system of the device."
+    - name: browser
+      type: string
+      description: "The browser of the device."
+    - name: ipAddress
+      type: string
+      description: "The IP address of the device."
+    - name: loginTime
+      type: string
+      description: "The login time of the device."
+    - name: principalName
+      type: string
+      description: "The principal name of the device."

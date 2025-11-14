@@ -1,17 +1,18 @@
 <script lang="ts" setup>
 // core libs
-import { onMounted, ref } from "vue";
-import { apiClient } from "@/utils/api-client";
 import type { CreateUserRequest } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
+import { onMounted, ref } from "vue";
 
 // components
-import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import SubmitButton from "@/components/button/SubmitButton.vue";
+import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 
 // hooks
+import { PASSWORD_REGEX } from "@/constants/regex";
 import { setFocus } from "@/formkit/utils/focus";
-import { useI18n } from "vue-i18n";
 import { useQueryClient } from "@tanstack/vue-query";
+import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const queryClient = useQueryClient();
@@ -28,10 +29,8 @@ const formState = ref<CreateUserRequest>({
   email: "",
   name: "",
   password: "",
-  phone: "",
   roles: [],
 });
-const selectedRole = ref("");
 const isSubmitting = ref(false);
 
 onMounted(() => {
@@ -42,11 +41,7 @@ const handleCreateUser = async () => {
   try {
     isSubmitting.value = true;
 
-    if (selectedRole.value) {
-      formState.value.roles = [selectedRole.value];
-    }
-
-    await apiClient.user.createUser({
+    await consoleApiClient.user.createUser({
       createUserRequest: formState.value,
     });
 
@@ -84,7 +79,7 @@ const handleCreateUser = async () => {
         name="name"
         :validation="[
           ['required'],
-          ['length:0,63'],
+          ['length', 0, 63],
           [
             'matches',
             /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/,
@@ -109,26 +104,25 @@ const handleCreateUser = async () => {
         validation="required|email|length:0,100"
       ></FormKit>
       <FormKit
-        v-model="formState.phone"
-        :label="$t('core.user.editing_modal.fields.phone.label')"
-        type="text"
-        name="phone"
-        validation="length:0,20"
-      ></FormKit>
-      <FormKit
         v-model="formState.password"
         :label="$t('core.user.change_password_modal.fields.new_password.label')"
         type="password"
         name="password"
-        validation="required:trim|length:5,100|matches:/^\S.*\S$/"
+        :validation="[
+          ['required'],
+          ['length', 5, 257],
+          ['matches', PASSWORD_REGEX],
+        ]"
         :validation-messages="{
-          matches: $t('core.formkit.validation.trim'),
+          matches: $t('core.formkit.validation.password'),
         }"
       ></FormKit>
+      <!-- @vue-ignore -->
       <FormKit
-        v-model="selectedRole"
+        v-model="formState.roles"
         :label="$t('core.user.grant_permission_modal.fields.role.label')"
         type="roleSelect"
+        multiple
         validation="required"
       ></FormKit>
       <FormKit
@@ -136,6 +130,8 @@ const handleCreateUser = async () => {
         :label="$t('core.user.editing_modal.fields.bio.label')"
         type="textarea"
         name="bio"
+        auto-height
+        :max-auto-height="200"
         validation="length:0,2048"
       ></FormKit>
     </FormKit>

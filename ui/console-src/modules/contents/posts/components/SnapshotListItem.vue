@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ListedSnapshotDto, Post } from "@halo-dev/api-client";
-import { apiClient } from "@/utils/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
 import { Dialog, Toast, VButton, VStatusDot, VTag } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
 import { useQueryClient } from "@tanstack/vue-query";
 import { computed } from "vue";
-import { relativeTimeTo } from "@/utils/date";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -29,7 +29,7 @@ async function handleRestore() {
     confirmText: t("core.common.buttons.confirm"),
     cancelText: t("core.common.buttons.cancel"),
     async onConfirm() {
-      await apiClient.post.revertToSpecifiedSnapshotForPost({
+      await consoleApiClient.content.post.revertToSpecifiedSnapshotForPost({
         name: props.post?.metadata.name as string,
         revertSnapshotForPostParam: {
           snapshotName: props.snapshot.metadata.name,
@@ -50,7 +50,7 @@ function handleDelete() {
     confirmText: t("core.common.buttons.confirm"),
     cancelText: t("core.common.buttons.cancel"),
     async onConfirm() {
-      await apiClient.post.deletePostContent({
+      await consoleApiClient.content.post.deletePostContent({
         name: props.post?.metadata.name as string,
         snapshotName: props.snapshot.metadata.name,
       });
@@ -98,7 +98,7 @@ const isBase = computed(() => {
           'font-semibold': isSelected,
         }"
       >
-        {{ relativeTimeTo(snapshot.metadata.creationTimestamp) }}
+        {{ utils.date.timeAgo(snapshot.metadata.creationTimestamp) }}
       </div>
       <div class="inline-flex flex-none items-center space-x-3">
         <VTag v-if="isReleased" theme="primary">

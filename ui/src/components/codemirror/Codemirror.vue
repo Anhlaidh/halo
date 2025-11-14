@@ -1,57 +1,36 @@
 <script lang="ts" setup>
-import { onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
-import type { EditorStateConfig } from "@codemirror/state";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { basicSetup } from "codemirror";
-import { LanguageSupport, StreamLanguage } from "@codemirror/language";
-import { yaml } from "@codemirror/legacy-modes/mode/yaml";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { css } from "@codemirror/lang-css";
-import { json } from "@codemirror/lang-json";
+import { onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
+import { presetLanguages, type CodemirrorProps } from "./supports";
 
-const presetLanguages = {
-  yaml: StreamLanguage.define(yaml),
-  html: html(),
-  javascript: javascript({
-    jsx: true,
-    typescript: true,
-  }),
-  css: css(),
-  json: json(),
-};
-
-const props = withDefaults(
-  defineProps<{
-    modelValue?: string;
-    height?: string;
-    language: keyof typeof presetLanguages | LanguageSupport;
-    extensions?: EditorStateConfig["extensions"];
-  }>(),
-  {
-    modelValue: "",
-    height: "auto",
-    language: "yaml",
-    extensions: () => [],
-  }
-);
+const props = withDefaults(defineProps<CodemirrorProps>(), {
+  modelValue: "",
+  height: "auto",
+  language: "yaml",
+  extensions: () => [],
+});
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
   (e: "change", value: string): void;
 }>();
 
-const customTheme = EditorView.theme({
-  "&": {
-    height: props.height,
-    width: "100%",
-  },
-});
-
 const wrapper = shallowRef<HTMLDivElement>();
 const cmState = shallowRef<EditorState>();
 const cmView = shallowRef<EditorView>();
+
+const themeCompartment = new Compartment();
+
+const createCustomTheme = (height: string) => {
+  return EditorView.theme({
+    "&": {
+      height,
+      width: "100%",
+    },
+  });
+};
 
 const createCmEditor = () => {
   const language =
@@ -62,7 +41,7 @@ const createCmEditor = () => {
   let extensions = [
     basicSetup,
     EditorView.lineWrapping,
-    customTheme,
+    themeCompartment.of(createCustomTheme(props.height)),
     language,
     EditorView.updateListener.of((viewUpdate) => {
       if (viewUpdate.docChanged) {
@@ -102,6 +81,17 @@ onMounted(() => {
             to: cmView.value?.state.doc.length,
             insert: newValue,
           },
+        });
+      }
+    }
+  );
+
+  watch(
+    () => props.height,
+    (newHeight) => {
+      if (cmView.value) {
+        cmView.value.dispatch({
+          effects: themeCompartment.reconfigure(createCustomTheme(newHeight)),
         });
       }
     }

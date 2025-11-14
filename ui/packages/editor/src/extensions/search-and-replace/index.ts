@@ -1,15 +1,15 @@
+import { ToolbarItem } from "@/components";
+import { i18n } from "@/locales";
+import { EditorState } from "@/tiptap/pm";
 import { Editor, Extension } from "@/tiptap/vue-3";
+import type { ExtensionOptions } from "@/types";
+import { h, markRaw, render } from "vue";
+import MdiTextBoxSearchOutline from "~icons/mdi/text-box-search-outline";
+import SearchAndReplaceVue from "./SearchAndReplace.vue";
 import {
   SearchAndReplacePlugin,
   searchAndReplacePluginKey,
 } from "./SearchAndReplacePlugin";
-import SearchAndReplaceVue from "./SearchAndReplace.vue";
-import { h, markRaw, render } from "vue";
-import { EditorState } from "@/tiptap/pm";
-import type { ExtensionOptions } from "@/types";
-import { i18n } from "@/locales";
-import { ToolbarItem } from "@/components";
-import MdiTextBoxSearchOutline from "~icons/mdi/text-box-search-outline";
 
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
@@ -42,6 +42,7 @@ declare module "@/tiptap" {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const instance = h<any>(SearchAndReplaceVue);
 function isShowSearch() {
   const searchAndReplaceInstance = instance.component;
@@ -95,6 +96,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           const searchAndReplaceState =
@@ -130,6 +132,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           const searchAndReplaceState =
@@ -161,6 +164,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           if (dispatch) {
@@ -187,6 +191,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           if (dispatch) {
@@ -212,6 +217,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           const searchAndReplaceState =
@@ -240,6 +246,7 @@ const SearchAndReplace = Extension.create<ExtensionOptions>({
           dispatch,
         }: {
           state: EditorState;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           dispatch: ((args?: any) => any) | undefined;
         }) => {
           const searchAndReplaceState =

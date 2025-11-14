@@ -19,21 +19,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 import run.halo.app.core.extension.Role;
-import run.halo.app.core.extension.service.RoleService;
+import run.halo.app.core.user.service.RoleService;
 import run.halo.app.extension.ExtensionClient;
 import run.halo.app.extension.FakeExtension;
 import run.halo.app.extension.GroupVersionKind;
 import run.halo.app.extension.Metadata;
 import run.halo.app.extension.Scheme;
 import run.halo.app.extension.SchemeManager;
-import run.halo.app.extension.index.IndexerFactory;
 import run.halo.app.extension.store.ExtensionStoreRepository;
 
 @DirtiesContext
@@ -47,7 +46,7 @@ class ExtensionConfigurationTest {
     @Autowired
     SchemeManager schemeManager;
 
-    @MockBean
+    @MockitoBean
     RoleService roleService;
 
     @BeforeEach
@@ -70,12 +69,8 @@ class ExtensionConfigurationTest {
     }
 
     @AfterEach
-    void cleanUp(@Autowired ExtensionStoreRepository repository,
-        @Autowired IndexerFactory indexerFactory) {
+    void cleanUp(@Autowired ExtensionStoreRepository repository) {
         var gvk = Scheme.buildFromType(FakeExtension.class).groupVersionKind();
-        if (indexerFactory.contains(gvk)) {
-            indexerFactory.getIndexer(gvk).removeIndexRecords(descriptor -> true);
-        }
         repository.deleteAll().block();
         schemeManager.fetch(GroupVersionKind.fromExtension(FakeExtension.class))
             .ifPresent(scheme -> schemeManager.unregister(scheme));

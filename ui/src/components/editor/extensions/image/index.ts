@@ -1,7 +1,8 @@
-import { ExtensionImage, VueNodeViewRenderer } from "@halo-dev/richtext-editor";
-import ImageView from "./ImageView.vue";
-import type { AxiosRequestConfig } from "axios";
 import type { Attachment } from "@halo-dev/api-client";
+import type { ExtensionOptions } from "@halo-dev/richtext-editor";
+import { ExtensionImage, VueNodeViewRenderer } from "@halo-dev/richtext-editor";
+import type { AxiosRequestConfig } from "axios";
+import ImageView from "./ImageView.vue";
 
 export interface ImageOptions {
   inline: boolean;
@@ -16,7 +17,9 @@ export interface UiImageOptions {
   ) => Promise<Attachment>;
 }
 
-const Image = ExtensionImage.extend<ImageOptions & UiImageOptions>({
+const Image = ExtensionImage.extend<
+  ExtensionOptions & Partial<ImageOptions> & UiImageOptions
+>({
   addOptions() {
     const { parent } = this;
     return {

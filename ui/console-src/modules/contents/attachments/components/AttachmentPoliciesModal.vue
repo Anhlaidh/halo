@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import { apiClient } from "@/utils/api-client";
-import { formatDatetime } from "@/utils/date";
+import { SYSTEM_PROTECTION } from "@/constants/finalizers";
 import type { Policy, PolicyTemplate } from "@halo-dev/api-client";
+import { consoleApiClient, coreApiClient } from "@halo-dev/api-client";
 import {
   Dialog,
   IconAddCircle,
@@ -11,11 +11,14 @@ import {
   VDropdownItem,
   VEmpty,
   VEntity,
+  VEntityContainer,
   VEntityField,
   VModal,
   VSpace,
   VStatusDot,
+  VTag,
 } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -50,7 +53,7 @@ const handleOpenCreateNewPolicyModal = (policyTemplate: PolicyTemplate) => {
 };
 
 const handleDelete = async (policy: Policy) => {
-  const { data } = await apiClient.attachment.searchAttachments({
+  const { data } = await consoleApiClient.storage.attachment.searchAttachments({
     fieldSelector: [`spec.policyName=${policy.metadata.name}`],
   });
 
@@ -76,9 +79,9 @@ const handleDelete = async (policy: Policy) => {
     confirmText: t("core.common.buttons.confirm"),
     cancelText: t("core.common.buttons.cancel"),
     onConfirm: async () => {
-      await apiClient.extension.storage.policy.deleteStorageHaloRunV1alpha1Policy(
-        { name: policy.metadata.name }
-      );
+      await coreApiClient.storage.policy.deletePolicy({
+        name: policy.metadata.name,
+      });
 
       Toast.success(t("core.common.toast.delete_success"));
       handleFetchPolicies();
@@ -138,7 +141,7 @@ function getPolicyTemplateDisplayName(templateName: string) {
           <VDropdown>
             <VButton type="secondary">
               <template #icon>
-                <IconAddCircle class="h-full w-full" />
+                <IconAddCircle />
               </template>
               {{ $t("core.common.buttons.new") }}
             </VButton>
@@ -155,50 +158,59 @@ function getPolicyTemplateDisplayName(templateName: string) {
         </VSpace>
       </template>
     </VEmpty>
-    <ul
-      v-else
-      class="box-border h-full w-full divide-y divide-gray-100"
-      role="list"
-    >
-      <li v-for="(policy, index) in policies" :key="index">
-        <VEntity>
-          <template #start>
-            <VEntityField
-              :title="policy.spec.displayName"
-              :description="
-                getPolicyTemplateDisplayName(policy.spec.templateName)
-              "
-            ></VEntityField>
-          </template>
-          <template #end>
-            <VEntityField v-if="policy.metadata.deletionTimestamp">
-              <template #description>
-                <VStatusDot
-                  v-tooltip="$t('core.common.status.deleting')"
-                  state="warning"
-                  animate
-                />
-              </template>
-            </VEntityField>
-            <VEntityField>
-              <template #description>
-                <span class="truncate text-xs tabular-nums text-gray-500">
-                  {{ formatDatetime(policy.metadata.creationTimestamp) }}
-                </span>
-              </template>
-            </VEntityField>
-          </template>
-          <template #dropdownItems>
-            <VDropdownItem @click="handleOpenEditingModal(policy)">
-              {{ $t("core.common.buttons.edit") }}
-            </VDropdownItem>
-            <VDropdownItem type="danger" @click="handleDelete(policy)">
-              {{ $t("core.common.buttons.delete") }}
-            </VDropdownItem>
-          </template>
-        </VEntity>
-      </li>
-    </ul>
+    <VEntityContainer v-else>
+      <VEntity v-for="policy in policies" :key="policy.metadata.name">
+        <template #start>
+          <VEntityField
+            :title="policy.spec.displayName"
+            :description="
+              getPolicyTemplateDisplayName(policy.spec.templateName)
+            "
+          ></VEntityField>
+        </template>
+        <template #end>
+          <VEntityField>
+            <template
+              v-if="policy.metadata.finalizers?.includes(SYSTEM_PROTECTION)"
+              #description
+            >
+              <VTag>{{ $t("core.common.text.system_protection") }}</VTag>
+            </template>
+          </VEntityField>
+          <VEntityField v-if="policy.metadata.deletionTimestamp">
+            <template #description>
+              <VStatusDot
+                v-tooltip="$t('core.common.status.deleting')"
+                state="warning"
+                animate
+              />
+            </template>
+          </VEntityField>
+          <VEntityField>
+            <template #description>
+              <span class="truncate text-xs tabular-nums text-gray-500">
+                {{ utils.date.format(policy.metadata.creationTimestamp) }}
+              </span>
+            </template>
+          </VEntityField>
+        </template>
+        <template #dropdownItems>
+          <VDropdownItem
+            :disabled="policy.metadata.finalizers?.includes(SYSTEM_PROTECTION)"
+            @click="handleOpenEditingModal(policy)"
+          >
+            {{ $t("core.common.buttons.edit") }}
+          </VDropdownItem>
+          <VDropdownItem
+            :disabled="policy.metadata.finalizers?.includes(SYSTEM_PROTECTION)"
+            type="danger"
+            @click="handleDelete(policy)"
+          >
+            {{ $t("core.common.buttons.delete") }}
+          </VDropdownItem>
+        </template>
+      </VEntity>
+    </VEntityContainer>
     <template #footer>
       <VButton @click="modal?.close()">
         {{ $t("core.common.buttons.close_and_shortcut") }}

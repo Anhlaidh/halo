@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { VButton, VSpace, VDropdown } from "@halo-dev/components";
-import type { CoreEditor } from "@halo-dev/richtext-editor";
-import { useFileDialog } from "@vueuse/core";
-import type { AttachmentLike } from "@halo-dev/console-shared";
-import { getAttachmentUrl, type AttachmentAttr } from "../utils/attachment";
 import { i18n } from "@/locales";
-import { onUnmounted, ref } from "vue";
-import { watch } from "vue";
-import { uploadFile } from "../utils/upload";
 import type { Attachment } from "@halo-dev/api-client";
+import { VButton, VDropdown, VSpace } from "@halo-dev/components";
+import type { Editor } from "@halo-dev/richtext-editor";
+import {
+  utils,
+  type AttachmentLike,
+  type AttachmentSimple,
+} from "@halo-dev/ui-shared";
+import { useFileDialog } from "@vueuse/core";
 import type { AxiosRequestConfig } from "axios";
-import HasPermission from "@/components/permission/HasPermission.vue";
+import { onUnmounted, ref, watch } from "vue";
+import { uploadFile } from "../utils/upload";
 
 const props = withDefaults(
   defineProps<{
-    editor: CoreEditor;
+    editor: Editor;
     accept: string;
     uploadedFile: File;
     uploadToAttachmentFile: (
@@ -29,7 +30,7 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (event: "setExternalLink", attachment: AttachmentAttr): void;
+  (event: "setExternalLink", attachment?: AttachmentSimple): void;
   (event: "onUploadReady", file: File): void;
   (event: "onUploadProgress", progress: number): void;
   (event: "onUploadFinish"): void;
@@ -58,8 +59,8 @@ const openAttachmentSelector = () => {
     (attachments: AttachmentLike[]) => {
       if (attachments.length > 0) {
         const attachment = attachments[0];
-        const attachmentAttr = getAttachmentUrl(attachment);
-        emit("setExternalLink", attachmentAttr);
+        const attachmentSimple = utils.attachment.convertToSimple(attachment);
+        emit("setExternalLink", attachmentSimple);
       }
     },
     {
@@ -97,7 +98,7 @@ const handleUploadFile = (file: File) => {
       if (attachment) {
         emit("setExternalLink", {
           url: attachment.status?.permalink,
-        });
+        } as AttachmentSimple);
       }
       handleResetUpload();
       emit("onUploadFinish");
@@ -195,7 +196,9 @@ defineExpose({
             </VButton>
           </HasPermission>
 
-          <HasPermission :permissions="['system:attachments:manage']">
+          <HasPermission
+            :permissions="['system:attachments:view', 'uc:attachments:manage']"
+          >
             <VButton @click="openAttachmentSelector">
               {{
                 $t(

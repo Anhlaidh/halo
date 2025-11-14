@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/vue3";
 
-import { VDropdown, VDropdownItem, VDropdownDivider } from ".";
+import { VDropdown, VDropdownDivider, VDropdownItem } from ".";
 import { VButton } from "../button";
 
 const meta: Meta<typeof VDropdown> = {
@@ -18,9 +18,12 @@ const meta: Meta<typeof VDropdown> = {
     template: `
     <div style="height: 300px">
       <VDropdown>
-        ${args.default}
+        <VButton>Hello</VButton>
         <template #popper>
-          ${args.popper}
+          <VDropdownItem>删除</VDropdownItem>
+          <VDropdownDivider></VDropdownDivider>
+          <VDropdownItem>删除</VDropdownItem>
+          <VDropdownItem>编辑</VDropdownItem>
         </template>
       </VDropdown>
     </div>
@@ -34,13 +37,5 @@ export default meta;
 type Story = StoryObj<typeof VDropdown>;
 
 export const Default: Story = {
-  args: {
-    default: `<VButton>Hello</VButton>`,
-    popper: `
-      <VDropdownItem>删除</VDropdownItem>
-      <VDropdownDivider></VDropdownDivider>
-      <VDropdownItem>删除</VDropdownItem>
-      <VDropdownItem>编辑</VDropdownItem>
-    `,
-  },
+  args: {},
 };

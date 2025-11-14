@@ -1,11 +1,12 @@
-import { Extension } from "@/tiptap/vue-3";
 import { Plugin, PluginKey } from "@/tiptap/pm";
+import { Extension } from "@/tiptap/vue-3";
 
 /**
  * @param {object} args Arguments as deconstructable object
  * @param {Array | object} args.types possible types
  * @param {object} args.node node to check
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function nodeEqualsType({ types, node }: { types: any; node: any }) {
   return (
     (Array.isArray(types) && types.includes(node.type)) || node.type === types

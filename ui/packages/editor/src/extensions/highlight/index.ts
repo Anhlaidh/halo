@@ -1,26 +1,15 @@
-import type { Editor } from "@/tiptap/vue-3";
-import TiptapHighlight from "@tiptap/extension-highlight";
-import type { HighlightOptions } from "@tiptap/extension-highlight";
-import MdiFormatColorHighlight from "~icons/mdi/format-color-highlight";
-import { markRaw } from "vue";
 import { i18n } from "@/locales";
+import type { Editor } from "@/tiptap";
 import type { ExtensionOptions } from "@/types";
+import type { HighlightOptions } from "@tiptap/extension-highlight";
+import TiptapHighlight from "@tiptap/extension-highlight";
+import { markRaw } from "vue";
+import MdiFormatColorHighlight from "~icons/mdi/format-color-highlight";
 import HighlightToolbarItem from "./HighlightToolbarItem.vue";
 
-const Highlight = TiptapHighlight.extend<ExtensionOptions & HighlightOptions>({
-  addAttributes() {
-    if (!this.options.multicolor) {
-      return {};
-    }
-
-    return {
-      ...this.parent?.(),
-      style: {
-        default: "display: inline-block;",
-        parseHTML: (element) => element.getAttribute("style"),
-      },
-    };
-  },
+const Highlight = TiptapHighlight.extend<
+  ExtensionOptions & Partial<HighlightOptions>
+>({
   addOptions() {
     return {
       ...this.parent?.(),

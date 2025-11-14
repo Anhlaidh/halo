@@ -1,18 +1,15 @@
 package run.halo.app.extension.router;
 
-import static org.springframework.data.domain.Sort.Order.asc;
-import static org.springframework.data.domain.Sort.Order.desc;
 import static run.halo.app.extension.Comparators.compareCreationTimestamp;
 import static run.halo.app.extension.Comparators.compareName;
 import static run.halo.app.extension.Comparators.nullsComparator;
+import static run.halo.app.extension.ExtensionUtil.defaultSort;
 import static run.halo.app.extension.router.selector.SelectorUtil.labelAndFieldSelectorToListOptions;
-import static run.halo.app.extension.router.selector.SelectorUtil.labelAndFieldSelectorToPredicate;
 
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Comparator;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.springdoc.core.fn.builders.operation.Builder;
 import org.springframework.beans.BeanWrapper;
@@ -43,19 +40,7 @@ public class SortableRequest extends IListRequest.QueryListRequest {
             example = "metadata.creationTimestamp,desc"))
     public Sort getSort() {
         return SortResolver.defaultInstance.resolve(exchange)
-            .and(Sort.by(desc("metadata.creationTimestamp"),
-                asc("metadata.name"))
-            );
-    }
-
-    /**
-     * Build predicate from query params, default is label and field selector, you can
-     * override this method to change it.
-     *
-     * @return predicate
-     */
-    public <T extends Extension> Predicate<T> toPredicate() {
-        return labelAndFieldSelectorToPredicate(getLabelSelector(), getFieldSelector());
+            .and(defaultSort());
     }
 
     /**

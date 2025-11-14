@@ -1,10 +1,10 @@
 <script lang="ts" setup>
 import SubmitButton from "@/components/button/SubmitButton.vue";
 import { setFocus } from "@/formkit/utils/focus";
-import { apiClient } from "@/utils/api-client";
 import type { Group } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
 import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep } from "es-toolkit";
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
@@ -45,18 +45,24 @@ const handleSave = async () => {
   try {
     isSubmitting.value = true;
     if (props.group) {
-      await apiClient.extension.storage.group.updateStorageHaloRunV1alpha1Group(
-        {
-          name: formState.value.metadata.name,
-          group: formState.value,
-        }
-      );
+      await coreApiClient.storage.group.updateGroup({
+        name: formState.value.metadata.name,
+        group: formState.value,
+      });
     } else {
-      await apiClient.extension.storage.group.createStorageHaloRunV1alpha1Group(
-        {
-          group: formState.value,
-        }
+      const { data: groups } = await coreApiClient.storage.group.listGroup();
+      const hasDisplayNameDuplicate = groups.items.some(
+        (group) => group.spec.displayName === formState.value.spec.displayName
       );
+      if (hasDisplayNameDuplicate) {
+        Toast.error(
+          t("core.attachment.group_editing_modal.toast.group_name_exists")
+        );
+        return;
+      }
+      await coreApiClient.storage.group.createGroup({
+        group: formState.value,
+      });
     }
 
     Toast.success(t("core.common.toast.save_success"));

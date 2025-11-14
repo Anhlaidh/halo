@@ -1,20 +1,13 @@
 <script lang="ts" setup>
-// core libs
-import { nextTick, ref } from "vue";
-import { apiClient } from "@/utils/api-client";
-import type { User } from "@halo-dev/api-client";
-
-// components
-import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import SubmitButton from "@/components/button/SubmitButton.vue";
-
-// libs
-import { cloneDeep } from "lodash-es";
-
-// hooks
-import AnnotationsForm from "@/components/form/AnnotationsForm.vue";
-import { useI18n } from "vue-i18n";
+import type AnnotationsForm from "@/components/form/AnnotationsForm.vue";
+import type { User } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
+import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
 import { useQueryClient } from "@tanstack/vue-query";
+import { cloneDeep } from "es-toolkit";
+import { nextTick, ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 const queryClient = useQueryClient();
@@ -54,7 +47,7 @@ const handleUpdateUser = async () => {
   try {
     isSubmitting.value = true;
 
-    await apiClient.extension.user.updateV1alpha1User({
+    await coreApiClient.user.updateUser({
       name: formState.value.metadata.name,
       user: formState.value,
     });
@@ -120,17 +113,12 @@ const handleUpdateUser = async () => {
               validation="required|email|length:0,100"
             ></FormKit>
             <FormKit
-              v-model="formState.spec.phone"
-              :label="$t('core.user.editing_modal.fields.phone.label')"
-              type="text"
-              name="phone"
-              validation="length:0,20"
-            ></FormKit>
-            <FormKit
               v-model="formState.spec.bio"
               :label="$t('core.user.editing_modal.fields.bio.label')"
               type="textarea"
               name="bio"
+              auto-height
+              :max-auto-height="200"
               validation="length:0,2048"
             ></FormKit>
           </div>

@@ -1,35 +1,32 @@
 <script lang="ts" setup>
-import ThemePreviewListItem from "./ThemePreviewListItem.vue";
-import { useSettingFormConvert } from "@console/composables/use-setting-form";
+import StickyBlock from "@/components/sticky-block/StickyBlock.vue";
 import { useThemeStore } from "@console/stores/theme";
-import { apiClient, axiosInstance } from "@/utils/api-client";
-import type {
-  ConfigMap,
-  Setting,
-  SettingForm,
-  Theme,
-} from "@halo-dev/api-client";
+import type { FormKitSchemaCondition, FormKitSchemaNode } from "@formkit/core";
+import type { Setting, SettingForm, Theme } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
 import {
-  VModal,
+  IconComputer,
   IconLink,
   IconPalette,
-  IconSettings,
-  IconArrowLeft,
-  VTabbar,
-  VButton,
-  IconComputer,
   IconPhone,
-  IconTablet,
   IconRefreshLine,
+  IconSettings,
+  IconTablet,
   Toast,
+  VButton,
+  VEntityContainer,
   VLoading,
+  VModal,
+  VTabbar,
 } from "@halo-dev/components";
-import { storeToRefs } from "pinia";
-import { computed, markRaw, ref, toRaw } from "vue";
-import { useI18n } from "vue-i18n";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
+import { cloneDeep } from "es-toolkit";
+import { set } from "es-toolkit/compat";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-vue";
-import { useQuery } from "@tanstack/vue-query";
-import { onMounted } from "vue";
+import { storeToRefs } from "pinia";
+import { computed, markRaw, onMounted, ref, toRaw } from "vue";
+import { useI18n } from "vue-i18n";
+import ThemePreviewListItem from "./ThemePreviewListItem.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -46,6 +43,7 @@ const emit = defineEmits<{
   (event: "close"): void;
 }>();
 
+const queryClient = useQueryClient();
 const { t } = useI18n();
 
 interface SettingTab {
@@ -55,6 +53,7 @@ interface SettingTab {
 
 const { activatedTheme } = storeToRefs(useThemeStore());
 
+const previewFrame = ref<HTMLIFrameElement | null>(null);
 const themesVisible = ref(false);
 const switching = ref(false);
 const selectedTheme = ref<Theme>();
@@ -62,7 +61,7 @@ const selectedTheme = ref<Theme>();
 const { data: themes } = useQuery<Theme[]>({
   queryKey: ["themes"],
   queryFn: async () => {
-    const { data } = await apiClient.theme.listThemes({
+    const { data } = await consoleApiClient.theme.theme.listThemes({
       page: 0,
       size: 0,
       uninstalled: false,
@@ -100,26 +99,6 @@ const modalTitle = computed(() => {
   });
 });
 
-const {
-  data: previewHTML,
-  isLoading,
-  refetch: refetchPreviewHTML,
-} = useQuery({
-  queryKey: ["site-preview", previewUrl],
-  queryFn: async () => {
-    const { data } = await axiosInstance.get(previewUrl.value, {
-      headers: {
-        Accept: "text/html",
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    });
-    return data;
-  },
-  enabled: computed(() => !!previewUrl.value),
-});
-
 // theme settings
 const saving = ref(false);
 const settingTabs = ref<SettingTab[]>([] as SettingTab[]);
@@ -129,7 +108,7 @@ const settingsVisible = ref(false);
 const { data: setting } = useQuery<Setting>({
   queryKey: ["theme-setting", selectedTheme],
   queryFn: async () => {
-    const { data } = await apiClient.theme.fetchThemeSetting({
+    const { data } = await consoleApiClient.theme.theme.fetchThemeSetting({
       name: selectedTheme?.value?.metadata.name as string,
     });
 
@@ -151,10 +130,10 @@ const { data: setting } = useQuery<Setting>({
   enabled: computed(() => !!selectedTheme.value?.spec.settingName),
 });
 
-const { data: configMap, refetch: handleFetchConfigMap } = useQuery<ConfigMap>({
-  queryKey: ["theme-configMap", selectedTheme],
+const { data: configMapData } = useQuery({
+  queryKey: ["core:theme:configMap:data", selectedTheme],
   queryFn: async () => {
-    const { data } = await apiClient.theme.fetchThemeConfig({
+    const { data } = await consoleApiClient.theme.theme.fetchThemeJsonConfig({
       name: selectedTheme?.value?.metadata.name as string,
     });
     return data;
@@ -164,34 +143,47 @@ const { data: configMap, refetch: handleFetchConfigMap } = useQuery<ConfigMap>({
   ),
 });
 
-const { formSchema, configMapFormData, convertToSave } = useSettingFormConvert(
-  setting,
-  configMap,
-  activeSettingTab
-);
+const currentConfigMapGroupData = computed(() => {
+  return configMapData.value?.[activeSettingTab.value];
+});
 
-const handleSaveConfigMap = async () => {
+const formSchema = computed(() => {
+  if (!setting.value) {
+    return;
+  }
+  const { forms } = setting.value.spec;
+  return forms.find((item) => item.group === activeSettingTab.value)
+    ?.formSchema as (FormKitSchemaCondition | FormKitSchemaNode)[];
+});
+
+const handleRefresh = () => {
+  previewFrame.value?.contentWindow?.location.reload();
+};
+
+const handleSaveConfigMap = async (data: object) => {
   saving.value = true;
 
-  const configMapToUpdate = convertToSave();
-
-  if (!configMapToUpdate || !selectedTheme?.value) {
+  if (!selectedTheme?.value) {
     saving.value = false;
     return;
   }
 
-  await apiClient.theme.updateThemeConfig({
+  await consoleApiClient.theme.theme.updateThemeJsonConfig({
     name: selectedTheme?.value?.metadata.name,
-    configMap: configMapToUpdate,
+    body: set(
+      cloneDeep(configMapData.value) || {},
+      activeSettingTab.value,
+      data
+    ),
   });
 
   Toast.success(t("core.common.toast.save_success"));
 
-  await handleFetchConfigMap();
+  queryClient.invalidateQueries({ queryKey: ["core:theme:configMap:data"] });
 
   saving.value = false;
 
-  refetchPreviewHTML();
+  handleRefresh();
 };
 
 const handleOpenSettings = (theme?: Theme) => {
@@ -272,7 +264,7 @@ const iframeClasses = computed(() => {
           content: $t('core.common.buttons.refresh'),
           delay: 300,
         }"
-        @click="refetchPreviewHTML()"
+        @click="handleRefresh()"
       >
         <IconRefreshLine />
       </span>
@@ -320,6 +312,7 @@ const iframeClasses = computed(() => {
             @after-leave="switching = false"
           >
             <div v-show="settingsVisible" class="mb-20">
+              <!-- @vue-skip -->
               <VTabbar
                 v-model:active-id="activeSettingTab"
                 :items="settingTabs"
@@ -327,43 +320,36 @@ const iframeClasses = computed(() => {
                 type="outline"
               ></VTabbar>
               <div class="bg-white p-3">
-                <div v-for="(tab, index) in settingTabs" :key="index">
-                  <FormKit
-                    v-if="
-                      tab.id === activeSettingTab &&
-                      configMapFormData[tab.id] &&
-                      formSchema
-                    "
-                    :id="`preview-setting-${tab.id}`"
-                    :key="tab.id"
-                    v-model="configMapFormData[tab.id]"
-                    :name="tab.id"
-                    :actions="false"
-                    :preserve="true"
-                    type="form"
-                    @submit="handleSaveConfigMap"
+                <FormKit
+                  v-if="
+                    activeSettingTab && formSchema && currentConfigMapGroupData
+                  "
+                  :id="activeSettingTab"
+                  :key="activeSettingTab"
+                  :value="currentConfigMapGroupData || {}"
+                  :name="activeSettingTab"
+                  :preserve="true"
+                  type="form"
+                  @submit="handleSaveConfigMap"
+                >
+                  <FormKitSchema
+                    :schema="toRaw(formSchema)"
+                    :data="toRaw(currentConfigMapGroupData)"
+                  />
+                </FormKit>
+                <StickyBlock
+                  v-permission="['system:themes:manage']"
+                  class="-mx-4 -mb-4 -mr-3 rounded-b-base rounded-t-lg bg-white p-4 pt-5"
+                  position="bottom"
+                >
+                  <VButton
+                    :loading="saving"
+                    type="secondary"
+                    @click="$formkit.submit(activeSettingTab)"
                   >
-                    <FormKitSchema
-                      :schema="toRaw(formSchema)"
-                      :data="configMapFormData[tab.id]"
-                    />
-                  </FormKit>
-                </div>
-                <div v-permission="['system:themes:manage']" class="pt-5">
-                  <div class="flex justify-start">
-                    <VButton
-                      :loading="saving"
-                      type="secondary"
-                      @click="
-                        $formkit.submit(
-                          `preview-setting-${activeSettingTab}` || ''
-                        )
-                      "
-                    >
-                      {{ $t("core.common.buttons.save") }}
-                    </VButton>
-                  </div>
-                </div>
+                    {{ $t("core.common.buttons.save") }}
+                  </VButton>
+                </StickyBlock>
               </div>
             </div>
           </transition>
@@ -379,56 +365,31 @@ const iframeClasses = computed(() => {
             @before-leave="switching = true"
             @after-leave="switching = false"
           >
-            <ul
-              v-show="themesVisible"
-              class="box-border h-full w-full divide-y divide-gray-100"
-              role="list"
-            >
-              <li
-                v-for="(item, index) in themes"
-                :key="index"
+            <VEntityContainer v-show="themesVisible">
+              <ThemePreviewListItem
+                v-for="item in themes"
+                :key="item.metadata.name"
+                :theme="item"
+                :is-selected="
+                  selectedTheme?.metadata.name === item.metadata.name
+                "
                 @click="handleSelect(item)"
-              >
-                <ThemePreviewListItem
-                  :theme="item"
-                  :is-selected="
-                    selectedTheme?.metadata.name === item.metadata.name
-                  "
-                  @open-settings="handleOpenSettings(item)"
-                />
-              </li>
-            </ul>
-          </transition>
-          <transition
-            enter-active-class="transform transition ease-in-out duration-300"
-            enter-from-class="translate-y-full"
-            enter-to-class="translate-y-0"
-            leave-active-class="transform transition ease-in-out duration-300"
-            leave-from-class="translate-y-0"
-            leave-to-class="translate-y-full"
-          >
-            <div v-if="settingsVisible" class="fixed bottom-2 left-2">
-              <VButton
-                size="md"
-                circle
-                type="primary"
-                @click="handleOpenThemes"
-              >
-                <IconArrowLeft />
-              </VButton>
-            </div>
+                @open-settings="handleOpenSettings(item)"
+              />
+            </VEntityContainer>
           </transition>
         </OverlayScrollbarsComponent>
       </transition>
       <div
         class="flex h-full flex-1 items-center justify-center transition-all duration-300"
       >
-        <VLoading v-if="isLoading" />
+        <VLoading v-if="!previewUrl" />
         <iframe
           v-else
+          ref="previewFrame"
           class="border-none transition-all duration-500"
           :class="iframeClasses"
-          :srcdoc="previewHTML"
+          :src="previewUrl"
         ></iframe>
       </div>
     </div>

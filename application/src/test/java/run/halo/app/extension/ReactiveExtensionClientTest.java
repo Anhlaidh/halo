@@ -43,8 +43,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import run.halo.app.extension.exception.SchemeNotFoundException;
-import run.halo.app.extension.index.Indexer;
-import run.halo.app.extension.index.IndexerFactory;
+import run.halo.app.extension.index.IndexEngine;
 import run.halo.app.extension.store.ExtensionStore;
 import run.halo.app.extension.store.ReactiveExtensionStoreClient;
 
@@ -63,15 +62,15 @@ class ReactiveExtensionClientTest {
     SchemeManager schemeManager;
 
     @Mock
-    IndexerFactory indexerFactory;
-
-    @Mock
     ReactiveTransactionManager reactiveTransactionManager;
 
     @Spy
     ObjectMapper objectMapper = JsonMapper.builder()
         .addModule(new JavaTimeModule())
         .build();
+
+    @Mock
+    IndexEngine indexEngine;
 
     @InjectMocks
     ReactiveExtensionClientImpl client;
@@ -108,6 +107,7 @@ class ReactiveExtensionClientTest {
         var extensionStore = new ExtensionStore();
         extensionStore.setName(name);
         extensionStore.setVersion(version);
+        extensionStore.setData("fake data".getBytes());
         return extensionStore;
     }
 
@@ -343,9 +343,7 @@ class ReactiveExtensionClientTest {
         when(storeClient.create(any(), any())).thenReturn(
             Mono.just(createExtensionStore("/registry/fake.halo.run/fakes/fake")));
         when(converter.convertFrom(same(FakeExtension.class), any())).thenReturn(fake);
-
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
+        doNothing().when(indexEngine).insert(any());
 
         StepVerifier.create(client.create(fake))
             .expectNext(fake)
@@ -354,7 +352,6 @@ class ReactiveExtensionClientTest {
         verify(converter, times(1)).convertTo(eq(fake));
         verify(storeClient, times(1)).create(eq("/registry/fake.halo.run/fakes/fake"), any());
         assertNotNull(fake.getMetadata().getCreationTimestamp());
-        verify(indexer).indexRecord(eq(fake));
     }
 
     @Test
@@ -367,9 +364,7 @@ class ReactiveExtensionClientTest {
         when(storeClient.create(any(), any())).thenReturn(
             Mono.just(createExtensionStore("/registry/fake.halo.run/fakes/fake")));
         when(converter.convertFrom(same(FakeExtension.class), any())).thenReturn(fake);
-
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
+        doNothing().when(indexEngine).insert(any());
 
         StepVerifier.create(client.create(fake))
             .expectNext(fake)
@@ -381,7 +376,6 @@ class ReactiveExtensionClientTest {
         }));
         verify(storeClient, times(1)).create(eq("/registry/fake.halo.run/fakes/fake"), any());
         assertNotNull(fake.getMetadata().getCreationTimestamp());
-        verify(indexer).indexRecord(eq(fake));
     }
 
     @Test
@@ -417,9 +411,7 @@ class ReactiveExtensionClientTest {
         when(storeClient.create(any(), any())).thenReturn(
             Mono.just(createExtensionStore("/registry/fake.halo.run/fakes/fake")));
         when(converter.convertFrom(same(Unstructured.class), any())).thenReturn(fake);
-
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
+        doNothing().when(indexEngine).insert(any());
 
         StepVerifier.create(client.create(fake))
             .expectNext(fake)
@@ -428,7 +420,6 @@ class ReactiveExtensionClientTest {
         verify(converter, times(1)).convertTo(eq(fake));
         verify(storeClient, times(1)).create(eq("/registry/fake.halo.run/fakes/fake"), any());
         assertNotNull(fake.getMetadata().getCreationTimestamp());
-        verify(indexer).indexRecord(eq(fake));
     }
 
     @Test
@@ -442,6 +433,7 @@ class ReactiveExtensionClientTest {
             Mono.just(createExtensionStore(storeName, 2L)));
         when(storeClient.fetchByName(storeName)).thenReturn(
             Mono.just(createExtensionStore(storeName, 1L)));
+        doNothing().when(indexEngine).update(any());
 
         var oldFake = createFakeExtension("fake", 2L);
         oldFake.getMetadata().setLabels(Map.of("old", "true"));
@@ -452,9 +444,6 @@ class ReactiveExtensionClientTest {
             .thenReturn(oldFake)
             .thenReturn(updatedFake);
 
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
-
         StepVerifier.create(client.update(fake))
             .expectNext(updatedFake)
             .verifyComplete();
@@ -464,7 +453,6 @@ class ReactiveExtensionClientTest {
         verify(converter, times(2)).convertFrom(same(FakeExtension.class), any());
         verify(storeClient)
             .update(eq("/registry/fake.halo.run/fakes/fake"), eq(2L), any());
-        verify(indexer).updateRecord(eq(updatedFake));
     }
 
     @Test
@@ -525,6 +513,7 @@ class ReactiveExtensionClientTest {
             Mono.just(createExtensionStore(storeName, 2L)));
         when(storeClient.fetchByName(storeName)).thenReturn(
             Mono.just(createExtensionStore(storeName, 1L)));
+        doNothing().when(indexEngine).update(any());
 
         var oldFake = createFakeExtension("fake", 2L);
         oldFake.getStatus().setState("old-state");
@@ -533,9 +522,6 @@ class ReactiveExtensionClientTest {
         when(converter.convertFrom(same(FakeExtension.class), any()))
             .thenReturn(oldFake)
             .thenReturn(updatedFake);
-
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
 
         StepVerifier.create(client.update(fake))
             .expectNext(updatedFake)
@@ -546,7 +532,6 @@ class ReactiveExtensionClientTest {
         verify(converter, times(2)).convertFrom(same(FakeExtension.class), any());
         verify(storeClient)
             .update(eq("/registry/fake.halo.run/fakes/fake"), eq(2L), any());
-        verify(indexer).updateRecord(eq(updatedFake));
     }
 
     @Test
@@ -559,6 +544,7 @@ class ReactiveExtensionClientTest {
             .thenReturn(Mono.just(createExtensionStore(name, 12345L)));
         when(storeClient.fetchByName(name))
             .thenReturn(Mono.just(createExtensionStore(name, 12346L)));
+        doNothing().when(indexEngine).update(any());
 
         var oldFake = createUnstructured();
         oldFake.getMetadata().setLabels(Map.of("old", "true"));
@@ -569,9 +555,6 @@ class ReactiveExtensionClientTest {
             .thenReturn(oldFake)
             .thenReturn(updatedFake);
 
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
-
         StepVerifier.create(client.update(fake))
             .expectNext(updatedFake)
             .verifyComplete();
@@ -581,7 +564,6 @@ class ReactiveExtensionClientTest {
         verify(converter, times(2)).convertFrom(same(Unstructured.class), any());
         verify(storeClient)
             .update(eq("/registry/fake.halo.run/fakes/fake"), eq(12345L), any());
-        verify(indexer).updateRecord(eq(updatedFake));
     }
 
     @Test
@@ -592,9 +574,7 @@ class ReactiveExtensionClientTest {
         when(storeClient.update(any(), any(), any())).thenReturn(
             Mono.just(createExtensionStore("/registry/fake.halo.run/fakes/fake")));
         when(converter.convertFrom(same(FakeExtension.class), any())).thenReturn(fake);
-
-        var indexer = mock(Indexer.class);
-        when(indexerFactory.getIndexer(eq(fake.groupVersionKind()))).thenReturn(indexer);
+        doNothing().when(indexEngine).update(any());
 
         StepVerifier.create(client.delete(fake))
             .expectNext(fake)
@@ -603,8 +583,30 @@ class ReactiveExtensionClientTest {
         verify(converter, times(1)).convertTo(any());
         verify(storeClient, times(1)).update(any(), any(), any());
         verify(storeClient, never()).delete(any(), any());
-        verify(indexer).updateRecord(eq(fake));
     }
+
+    @Test
+    void shouldGetJsonExtension() {
+        var storeName = "/registry/fake.halo.run/fakes/fake";
+        when(storeClient.fetchByName(storeName)).thenReturn(
+            Mono.just(createExtensionStore(storeName)));
+
+        var fake = createFakeExtension("fake", 1L);
+        var expectedJsonExt = objectMapper.convertValue(fake, JsonExtension.class);
+
+        when(converter.convertFrom(JsonExtension.class, createExtensionStore(storeName)))
+            .thenReturn(expectedJsonExt);
+
+        var gvk = Scheme.buildFromType(FakeExtension.class).groupVersionKind();
+        StepVerifier.create(client.getJsonExtension(gvk, "fake"))
+            .expectNext(expectedJsonExt)
+            .verifyComplete();
+
+        verify(storeClient, times(1)).fetchByName(eq(storeName));
+        verify(converter, times(1)).convertFrom(eq(JsonExtension.class),
+            eq(createExtensionStore(storeName)));
+    }
+
 
     @Nested
     @DisplayName("Extension watcher test")
@@ -654,6 +656,76 @@ class ReactiveExtensionClientTest {
             shouldDeleteSuccessfully();
 
             verify(watcher, times(1)).onDelete(any());
+        }
+
+        @Test
+        void shouldWatchRealTypeOnAdd() {
+            var name = "/registry/fake.halo.run/fakes/fake";
+            var extensionStore = createExtensionStore(name);
+            var fake = createFakeExtension("fake", 1L);
+            var unstructured = Unstructured.OBJECT_MAPPER.convertValue(fake, Unstructured.class);
+
+            when(converter.convertTo(unstructured)).thenReturn(extensionStore);
+            when(converter.convertFrom(Unstructured.class, extensionStore))
+                .thenReturn(unstructured);
+            when(storeClient.create(eq(name), any(byte[].class)))
+                .thenReturn(Mono.just(extensionStore));
+            doNothing().when(watcher).onAdd(isA(FakeExtension.class));
+
+            client.create(unstructured)
+                .as(StepVerifier::create)
+                .expectNext(unstructured)
+                .verifyComplete();
+        }
+
+        @Test
+        void shouldWatchRealTypeOnUpdate() {
+            var name = "/registry/fake.halo.run/fakes/fake";
+
+            var oldExtensionStore = createExtensionStore(name, 1L);
+            var extensionStore = createExtensionStore(name, 2L);
+            var oldFake = createFakeExtension("fake", 1L);
+            var fake = createFakeExtension("fake", 2L);
+            var oldUnstructured =
+                Unstructured.OBJECT_MAPPER.convertValue(oldFake, Unstructured.class);
+            var unstructured = Unstructured.OBJECT_MAPPER.convertValue(fake, Unstructured.class);
+
+            when(storeClient.fetchByName(name))
+                .thenReturn(Mono.just(oldExtensionStore));
+            when(converter.convertFrom(Unstructured.class, oldExtensionStore))
+                .thenReturn(oldUnstructured);
+            when(converter.convertFrom(Unstructured.class, extensionStore))
+                .thenReturn(unstructured);
+            when(converter.convertTo(isA(JsonExtension.class))).thenReturn(extensionStore);
+            when(storeClient.update(eq(name), eq(2L), any(byte[].class)))
+                .thenReturn(Mono.just(extensionStore));
+            doNothing().when(watcher).onUpdate(isA(FakeExtension.class), isA(FakeExtension.class));
+
+            client.update(unstructured)
+                .as(StepVerifier::create)
+                .expectNext(unstructured)
+                .verifyComplete();
+        }
+
+        @Test
+        void shouldWatchRealTypeOnDelete() {
+            var name = "/registry/fake.halo.run/fakes/fake";
+
+            var extensionStore = createExtensionStore(name, 1L);
+            var fake = createFakeExtension("fake", 1L);
+            var unstructured = Unstructured.OBJECT_MAPPER.convertValue(fake, Unstructured.class);
+
+            when(converter.convertFrom(Unstructured.class, extensionStore))
+                .thenReturn(unstructured);
+            when(converter.convertTo(unstructured)).thenReturn(extensionStore);
+            when(storeClient.update(eq(name), eq(1L), any(byte[].class)))
+                .thenReturn(Mono.just(extensionStore));
+            doNothing().when(watcher).onDelete(isA(FakeExtension.class));
+
+            client.delete(unstructured)
+                .as(StepVerifier::create)
+                .expectNext(unstructured)
+                .verifyComplete();
         }
     }
 

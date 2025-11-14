@@ -1,37 +1,39 @@
-import type { ExtensionOptions, NodeBubbleMenu } from "@/types";
+import { BlockActionSeparator } from "@/components";
+import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
+import ToolboxItem from "@/components/toolbox/ToolboxItem.vue";
+import { i18n } from "@/locales";
 import {
   Editor,
+  Node,
+  PluginKey,
+  VueNodeViewRenderer,
   isActive,
   mergeAttributes,
-  Node,
   nodeInputRule,
   nodePasteRule,
   type Range,
-  VueNodeViewRenderer,
-} from "@/tiptap/vue-3";
+} from "@/tiptap";
 import type { EditorState } from "@/tiptap/pm";
+import type { ExtensionOptions, NodeBubbleMenuType } from "@/types";
+import { deleteNode } from "@/utils";
+import { isAllowedUri } from "@/utils/is-allowed-uri";
 import { markRaw } from "vue";
-import IframeView from "./IframeView.vue";
-import MdiWeb from "~icons/mdi/web";
-import ToolboxItem from "@/components/toolbox/ToolboxItem.vue";
-import { i18n } from "@/locales";
-import { BlockActionSeparator } from "@/components";
-import BubbleIframeSize from "./BubbleItemIframeSize.vue";
-import BubbleIframeLink from "./BubbleItemIframeLink.vue";
 import MdiBorderAllVariant from "~icons/mdi/border-all-variant";
 import MdiBorderNoneVariant from "~icons/mdi/border-none-variant";
-import MdiDesktopMac from "~icons/mdi/desktop-mac";
-import MdiTabletIpad from "~icons/mdi/tablet-ipad";
 import MdiCellphoneIphone from "~icons/mdi/cellphone-iphone";
-import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
+import MdiDesktopMac from "~icons/mdi/desktop-mac";
 import MdiFormatAlignCenter from "~icons/mdi/format-align-center";
-import MdiFormatAlignRight from "~icons/mdi/format-align-right";
 import MdiFormatAlignJustify from "~icons/mdi/format-align-justify";
-import { deleteNode } from "@/utils";
-import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
-import MdiShare from "~icons/mdi/share";
+import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
+import MdiFormatAlignRight from "~icons/mdi/format-align-right";
 import MdiLinkVariant from "~icons/mdi/link-variant";
+import MdiShare from "~icons/mdi/share";
+import MdiTabletIpad from "~icons/mdi/tablet-ipad";
+import MdiWeb from "~icons/mdi/web";
 import MdiWebSync from "~icons/mdi/web-sync";
+import BubbleIframeLink from "./BubbleItemIframeLink.vue";
+import BubbleIframeSize from "./BubbleItemIframeSize.vue";
+import IframeView from "./IframeView.vue";
 
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
@@ -41,8 +43,11 @@ declare module "@/tiptap" {
   }
 }
 
+export const IFRAME_BUBBLE_MENU_KEY = new PluginKey("iframeBubbleMenu");
+
 const Iframe = Node.create<ExtensionOptions>({
   name: "iframe",
+  fakeSelection: true,
 
   inline() {
     return true;
@@ -144,11 +149,24 @@ const Iframe = Node.create<ExtensionOptions>({
     return [
       {
         tag: "iframe",
+        getAttrs: (dom) => {
+          const src = (dom as HTMLElement).getAttribute("src");
+
+          // prevent XSS attacks
+          if (!src || !isAllowedUri(src)) {
+            return false;
+          }
+          return { src };
+        },
       },
     ];
   },
 
   renderHTML({ HTMLAttributes }) {
+    // prevent XSS attacks
+    if (!isAllowedUri(HTMLAttributes.src)) {
+      return ["iframe", mergeAttributes({ ...HTMLAttributes, src: "" })];
+    }
     return ["iframe", mergeAttributes(HTMLAttributes)];
   },
 
@@ -228,7 +246,7 @@ const Iframe = Node.create<ExtensionOptions>({
       getToolboxItems({ editor }: { editor: Editor }) {
         return [
           {
-            priority: 40,
+            priority: 50,
             component: markRaw(ToolboxItem),
             props: {
               editor,
@@ -245,9 +263,9 @@ const Iframe = Node.create<ExtensionOptions>({
           },
         ];
       },
-      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenu {
+      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenuType {
         return {
-          pluginKey: "iframeBubbleMenu",
+          pluginKey: IFRAME_BUBBLE_MENU_KEY,
           shouldShow: ({ state }: { state: EditorState }) => {
             return isActive(state, Iframe.name);
           },
@@ -427,31 +445,6 @@ const Iframe = Node.create<ExtensionOptions>({
               },
             },
           ],
-        };
-      },
-      getDraggable() {
-        return {
-          getRenderContainer({ dom, view }) {
-            let container = dom;
-            while (container && container.tagName !== "P") {
-              container = container.parentElement as HTMLElement;
-            }
-            if (container) {
-              container = container.firstElementChild
-                ?.firstElementChild as HTMLElement;
-            }
-            let node;
-            if (container.firstElementChild) {
-              const pos = view.posAtDOM(container.firstElementChild, 0);
-              const $pos = view.state.doc.resolve(pos);
-              node = $pos.node();
-            }
-
-            return {
-              node: node,
-              el: container as HTMLElement,
-            };
-          },
         };
       },
     };

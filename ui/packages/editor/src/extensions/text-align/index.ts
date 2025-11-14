@@ -1,15 +1,16 @@
-import { type Editor } from "@/tiptap/vue-3";
-import TiptapTextAlign from "@tiptap/extension-text-align";
-import type { TextAlignOptions } from "@tiptap/extension-text-align";
 import ToolbarItem from "@/components/toolbar/ToolbarItem.vue";
-import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
-import MdiFormatAlignCenter from "~icons/mdi/format-align-center";
-import MdiFormatAlignRight from "~icons/mdi/format-align-right";
-import MdiFormatAlignJustify from "~icons/mdi/format-align-justify";
-import { markRaw } from "vue";
-import { i18n } from "@/locales";
-import type { ExtensionOptions } from "@/types";
 import ToolbarSubItem from "@/components/toolbar/ToolbarSubItem.vue";
+import { i18n } from "@/locales";
+import { type Editor } from "@/tiptap";
+import type { ExtensionOptions } from "@/types";
+import TiptapTextAlign, {
+  type TextAlignOptions,
+} from "@tiptap/extension-text-align";
+import { markRaw } from "vue";
+import MdiFormatAlignCenter from "~icons/mdi/format-align-center";
+import MdiFormatAlignJustify from "~icons/mdi/format-align-justify";
+import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
+import MdiFormatAlignRight from "~icons/mdi/format-align-right";
 
 const iconComponent = {
   left: MdiFormatAlignLeft,
@@ -29,7 +30,9 @@ const getIcon = (editor: Editor) => {
   return icon;
 };
 
-const TextAlign = TiptapTextAlign.extend<ExtensionOptions & TextAlignOptions>({
+const TextAlign = TiptapTextAlign.extend<
+  ExtensionOptions & Partial<TextAlignOptions>
+>({
   addOptions() {
     return {
       ...this.parent?.(),

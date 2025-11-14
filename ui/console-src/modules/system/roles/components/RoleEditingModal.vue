@@ -1,16 +1,17 @@
 <script lang="ts" setup>
-import { VButton, VModal, VSpace } from "@halo-dev/components";
 import SubmitButton from "@/components/button/SubmitButton.vue";
-import { onMounted, ref, watch } from "vue";
-import { rbacAnnotations } from "@/constants/annotations";
-import type { Role } from "@halo-dev/api-client";
 import { useRoleForm, useRoleTemplateSelection } from "@/composables/use-role";
-import { cloneDeep } from "lodash-es";
-import { setFocus } from "@/formkit/utils/focus";
+import { rbacAnnotations } from "@/constants/annotations";
 import { pluginLabels, roleLabels } from "@/constants/labels";
-import { useI18n } from "vue-i18n";
-import { apiClient } from "@/utils/api-client";
+import { setFocus } from "@/formkit/utils/focus";
+import { resolveDeepDependencies } from "@/utils/role";
+import type { Role } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
+import { VButton, VModal, VSpace } from "@halo-dev/components";
 import { useQuery } from "@tanstack/vue-query";
+import { cloneDeep } from "es-toolkit";
+import { onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
@@ -32,7 +33,7 @@ const modal = ref<InstanceType<typeof VModal> | null>(null);
 const { data: roleTemplates } = useQuery({
   queryKey: ["role-templates"],
   queryFn: async () => {
-    const { data } = await apiClient.extension.role.listV1alpha1Role({
+    const { data } = await coreApiClient.role.listRole({
       page: 0,
       size: 0,
       labelSelector: [`${roleLabels.TEMPLATE}=true`, "!halo.run/hidden"],
@@ -61,11 +62,9 @@ onMounted(() => {
 
   if (props.role) {
     formState.value = cloneDeep(props.role);
-    const dependencies =
-      props.role.metadata.annotations?.[rbacAnnotations.DEPENDENCIES];
-    if (dependencies) {
-      selectedRoleTemplates.value = new Set(JSON.parse(dependencies));
-    }
+    selectedRoleTemplates.value = new Set<string>(
+      resolveDeepDependencies(props.role, roleTemplates.value || [])
+    );
   }
 });
 
@@ -74,13 +73,8 @@ const editingModalTitle = props.role
   : t("core.role.editing_modal.titles.create");
 
 const handleCreateOrUpdateRole = async () => {
-  try {
-    await handleCreateOrUpdate();
-
-    modal.value?.close();
-  } catch (e) {
-    console.error(e);
-  }
+  await handleCreateOrUpdate();
+  modal.value?.close();
 };
 </script>
 <template>
@@ -117,15 +111,6 @@ const handleCreateOrUpdateRole = async () => {
               :label="$t('core.role.editing_modal.fields.display_name')"
               type="text"
               validation="required|length:0,50"
-            ></FormKit>
-            <FormKit
-              v-model="
-                formState.metadata.annotations[
-                  rbacAnnotations.REDIRECT_ON_LOGIN
-                ]
-              "
-              type="text"
-              :label="$t('core.role.editing_modal.fields.redirect_on_login')"
             ></FormKit>
             <FormKit
               v-model="
@@ -205,7 +190,10 @@ const handleCreateOrUpdateRole = async () => {
               </dt>
               <dd class="text-sm text-gray-900">
                 <ul class="space-y-2">
-                  <li v-for="(roleTemplate, index) in group.roles" :key="index">
+                  <li
+                    v-for="roleTemplate in group.roles"
+                    :key="roleTemplate.metadata.name"
+                  >
                     <label
                       class="inline-flex w-full cursor-pointer flex-row items-center gap-4 rounded-base border p-5 hover:border-primary"
                     >

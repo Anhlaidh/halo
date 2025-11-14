@@ -1,9 +1,9 @@
-import { definePlugin } from "@halo-dev/console-shared";
-import ThemeLayout from "./layouts/ThemeLayout.vue";
+import { IconPalette } from "@halo-dev/components";
+import { definePlugin } from "@halo-dev/ui-shared";
+import { markRaw } from "vue";
 import ThemeDetail from "./ThemeDetail.vue";
 import ThemeSetting from "./ThemeSetting.vue";
-import { IconPalette } from "@halo-dev/components";
-import { markRaw } from "vue";
+import ThemeLayout from "./layouts/ThemeLayout.vue";
 
 export default definePlugin({
   components: {},

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { i18n } from "@/locales";
-import type { Editor } from "@/tiptap/vue-3";
+import type { Editor } from "@/tiptap";
 import { computed, type Component } from "vue";
 import Image from "./index";
 
@@ -32,6 +32,6 @@ const src = computed({
   <input
     v-model.lazy="src"
     :placeholder="i18n.global.t('editor.common.placeholder.link_input')"
-    class="bg-gray-50 rounded-md hover:bg-gray-100 block px-2 w-full py-1.5 text-sm text-gray-900 border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+    class="block w-full rounded-md border border-gray-300 bg-gray-50 px-2 py-1.5 text-sm text-gray-900 hover:bg-gray-100 focus:border-blue-500 focus:ring-blue-500"
   />
 </template>

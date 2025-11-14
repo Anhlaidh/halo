@@ -4,6 +4,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +16,8 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.zip.ZipInputStream;
@@ -25,6 +29,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.transaction.ReactiveTransaction;
+import org.springframework.transaction.ReactiveTransactionManager;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -48,6 +54,9 @@ class MigrationServiceImplTest {
 
     @Mock
     BackupRootGetter backupRoot;
+
+    @Mock
+    ReactiveTransactionManager txManager;
 
     @InjectMocks
     MigrationServiceImpl migrationService;
@@ -118,8 +127,12 @@ class MigrationServiceImplTest {
         expectStore.setVersion(null);
 
         when(haloProperties.getWorkDir()).thenReturn(workdir);
-        when(repository.deleteAll(List.of(expectStore))).thenReturn(Mono.empty());
+        when(repository.deleteAll()).thenReturn(Mono.empty());
         when(repository.saveAll(List.of(expectStore))).thenReturn(Flux.empty());
+
+        var tx = mock(ReactiveTransaction.class);
+        when(txManager.getReactiveTransaction(any())).thenReturn(Mono.just(tx));
+        when(txManager.commit(tx)).thenReturn(Mono.empty());
 
         var content = DataBufferUtils.read(backupFile,
             DefaultDataBufferFactory.sharedInstance,
@@ -130,7 +143,7 @@ class MigrationServiceImplTest {
 
 
         verify(haloProperties).getWorkDir();
-        verify(repository).deleteAll(List.of(expectStore));
+        verify(repository).deleteAll();
         verify(repository).saveAll(List.of(expectStore));
 
         // make sure the workdir is recovered.
@@ -196,6 +209,66 @@ class MigrationServiceImplTest {
             .verify();
         verify(haloProperties, never()).getWorkDir();
         verify(backupRoot).get();
+    }
+
+    @Test
+    void getBackupFilesTest() throws Exception {
+        var now = Instant.now();
+        var backup1 = tempDir.resolve("backup1.zip");
+        Files.writeString(backup1, "fake-content");
+        Files.setLastModifiedTime(backup1, FileTime.from(now));
+
+        var backup2 = tempDir.resolve("backup2.zip");
+        Files.writeString(backup2, "fake--content");
+        Files.setLastModifiedTime(
+            backup2,
+            FileTime.from(now.plus(Duration.ofSeconds(1)))
+        );
+
+        var backup3 = tempDir.resolve("backup3.not-a-zip");
+        Files.writeString(backup3, "fake-content");
+        Files.setLastModifiedTime(
+            backup3,
+            FileTime.from(now.plus(Duration.ofSeconds(2)))
+        );
+        when(backupRoot.get()).thenReturn(tempDir);
+
+        migrationService.afterPropertiesSet();
+        migrationService.getBackupFiles()
+            .as(StepVerifier::create)
+            .assertNext(backupFile -> {
+                assertEquals("backup2.zip", backupFile.getFilename());
+                assertEquals(13, backupFile.getSize());
+                assertEquals(now.plus(Duration.ofSeconds(1)), backupFile.getLastModifiedTime());
+            })
+            .assertNext(backupFile -> {
+                assertEquals("backup1.zip", backupFile.getFilename());
+                assertEquals(12, backupFile.getSize());
+                assertEquals(now, backupFile.getLastModifiedTime());
+            })
+            .verifyComplete();
+    }
+
+    @Test
+    void getBackupFileTest() throws Exception {
+        var now = Instant.now();
+        Files.writeString(tempDir.resolve("backup.zip"), "fake-content");
+        Files.setLastModifiedTime(tempDir.resolve("backup.zip"), FileTime.from(now));
+        when(backupRoot.get()).thenReturn(tempDir);
+
+        migrationService.afterPropertiesSet();
+        migrationService.getBackupFile("backup.zip")
+            .as(StepVerifier::create)
+            .assertNext(backupFile -> {
+                assertEquals("backup.zip", backupFile.getFilename());
+                assertEquals(12, backupFile.getSize());
+                assertEquals(now, backupFile.getLastModifiedTime());
+            })
+            .verifyComplete();
+
+        migrationService.getBackupFile("backup-not-exist.zip")
+            .as(StepVerifier::create)
+            .verifyComplete();
     }
 
     Backup createSucceededBackup(String name, String filename) {

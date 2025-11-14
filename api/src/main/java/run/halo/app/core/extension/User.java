@@ -7,7 +7,6 @@ import static run.halo.app.core.extension.User.VERSION;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -45,6 +44,8 @@ public class User extends AbstractExtension {
     public static final String AVATAR_ATTACHMENT_NAME_ANNO = "halo.run/avatar-attachment-name";
 
     public static final String HIDDEN_USER_LABEL = "halo.run/hidden-user";
+
+    public static final String REQUEST_TO_UPDATE = "halo.run/request-to-update";
 
     @Schema(requiredMode = REQUIRED)
     private UserSpec spec = new UserSpec();
@@ -85,30 +86,7 @@ public class User extends AbstractExtension {
     @Data
     public static class UserStatus {
 
-        private Instant lastLoginAt;
-
         private String permalink;
-
-        private List<LoginHistory> loginHistories;
-
-    }
-
-    @Data
-    public static class LoginHistory {
-
-        @Schema(requiredMode = REQUIRED)
-        private Instant loginAt;
-
-        @Schema(requiredMode = REQUIRED)
-        private String sourceIp;
-
-        @Schema(requiredMode = REQUIRED)
-        private String userAgent;
-
-        @Schema(requiredMode = REQUIRED)
-        private Boolean successful;
-
-        private String reason;
 
     }
 

@@ -1,25 +1,8 @@
 <script lang="ts" setup>
-// core libs
-import {
-  computed,
-  nextTick,
-  onMounted,
-  provide,
-  type Ref,
-  ref,
-  watch,
-} from "vue";
-import { useRoute, useRouter } from "vue-router";
-
-// libs
-import { cloneDeep } from "lodash-es";
-
-// hooks
-import { useThemeLifeCycle } from "../composables/use-theme";
-// types
 import BasicLayout from "@console/layouts/BasicLayout.vue";
-
-// components
+import { useThemeStore } from "@console/stores/theme";
+import type { Setting, SettingForm, Theme } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
 import {
   Dialog,
   IconExchange,
@@ -34,18 +17,27 @@ import {
   VSpace,
   VTabbar,
 } from "@halo-dev/components";
-import ThemeListModal from "../components/ThemeListModal.vue";
-import ThemePreviewModal from "../components/preview/ThemePreviewModal.vue";
-import type { Setting, SettingForm, Theme } from "@halo-dev/api-client";
-import { usePermission } from "@/utils/permission";
-import { useThemeStore } from "@console/stores/theme";
-import { storeToRefs } from "pinia";
-import { apiClient } from "@/utils/api-client";
-import { useI18n } from "vue-i18n";
+import { utils } from "@halo-dev/ui-shared";
 import { useQuery } from "@tanstack/vue-query";
 import { useRouteQuery } from "@vueuse/router";
+import { cloneDeep } from "es-toolkit";
+import { storeToRefs } from "pinia";
+import {
+  computed,
+  nextTick,
+  onMounted,
+  provide,
+  ref,
+  shallowRef,
+  watch,
+  type Ref,
+} from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
+import ThemeListModal from "../components/ThemeListModal.vue";
+import ThemePreviewModal from "../components/preview/ThemePreviewModal.vue";
+import { useThemeLifeCycle } from "../composables/use-theme";
 
-const { currentUserHasPermission } = usePermission();
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
@@ -69,7 +61,7 @@ const initialTabs: ThemeTab[] = [
   },
 ];
 
-const tabs = ref<ThemeTab[]>(cloneDeep(initialTabs));
+const tabs = shallowRef<ThemeTab[]>(initialTabs);
 const selectedTheme = ref<Theme>();
 const themesModal = ref(false);
 const previewModal = ref(false);
@@ -85,7 +77,7 @@ provide<Ref<Theme | undefined>>("selectedTheme", selectedTheme);
 const { data: setting } = useQuery<Setting>({
   queryKey: ["theme-setting", selectedTheme],
   queryFn: async () => {
-    const { data } = await apiClient.theme.fetchThemeSetting({
+    const { data } = await consoleApiClient.theme.theme.fetchThemeSetting({
       name: selectedTheme.value?.metadata.name as string,
     });
     return data;
@@ -94,7 +86,7 @@ const { data: setting } = useQuery<Setting>({
     return (
       !!selectedTheme.value &&
       !!selectedTheme.value.spec.settingName &&
-      currentUserHasPermission(["system:themes:view"])
+      utils.permission.has(["system:themes:view"])
     );
   }),
   async onSuccess(data) {
@@ -195,32 +187,30 @@ onMounted(() => {
   <BasicLayout>
     <VPageHeader :title="selectedTheme?.spec.displayName">
       <template #icon>
-        <IconPalette class="mr-2 self-center" />
+        <IconPalette />
       </template>
       <template #actions>
-        <VSpace>
-          <VButton
-            v-show="!isActivated"
-            v-permission="['system:themes:manage']"
-            size="sm"
-            type="primary"
-            @click="handleActiveTheme()"
-          >
-            {{ $t("core.common.buttons.activate") }}
-          </VButton>
-          <VButton type="default" size="sm" @click="previewModal = true">
-            <template #icon>
-              <IconEye class="h-full w-full" />
-            </template>
-            {{ $t("core.common.buttons.preview") }}
-          </VButton>
-          <VButton type="secondary" @click="themesModal = true">
-            <template #icon>
-              <IconListSettings class="h-full w-full" />
-            </template>
-            {{ $t("core.theme.actions.management") }}
-          </VButton>
-        </VSpace>
+        <VButton
+          v-show="!isActivated"
+          v-permission="['system:themes:manage']"
+          size="sm"
+          type="primary"
+          @click="handleActiveTheme()"
+        >
+          {{ $t("core.common.buttons.activate") }}
+        </VButton>
+        <VButton type="default" size="sm" @click="previewModal = true">
+          <template #icon>
+            <IconEye />
+          </template>
+          {{ $t("core.common.buttons.preview") }}
+        </VButton>
+        <VButton type="secondary" @click="themesModal = true">
+          <template #icon>
+            <IconListSettings />
+          </template>
+          {{ $t("core.theme.actions.management") }}
+        </VButton>
       </template>
     </VPageHeader>
 
@@ -235,9 +225,9 @@ onMounted(() => {
             <VButton @click="themesModal = true">
               {{ $t("core.theme.common.buttons.install") }}
             </VButton>
-            <VButton type="primary" @click="themesModal = true">
+            <VButton type="secondary" @click="themesModal = true">
               <template #icon>
-                <IconExchange class="h-full w-full" />
+                <IconExchange />
               </template>
               {{ $t("core.theme.empty.actions.switch") }}
             </VButton>

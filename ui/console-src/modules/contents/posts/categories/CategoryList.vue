@@ -1,9 +1,5 @@
 <script lang="ts" setup>
-// core libs
-import { ref } from "vue";
-import { apiClient } from "@/utils/api-client";
-
-// components
+import { coreApiClient } from "@halo-dev/api-client";
 import {
   IconAddCircle,
   IconBookRead,
@@ -14,16 +10,13 @@ import {
   VPageHeader,
   VSpace,
 } from "@halo-dev/components";
+import { Draggable } from "@he-tree/vue";
+import "@he-tree/vue/style/default.css";
+import { ref } from "vue";
 import CategoryEditingModal from "./components/CategoryEditingModal.vue";
 import CategoryListItem from "./components/CategoryListItem.vue";
-
-import { convertTreeToCategories, resetCategoriesTreePriority } from "./utils";
-
-// libs
-import { useDebounceFn } from "@vueuse/core";
-
-// hooks
 import { usePostCategory } from "./composables/use-post-category";
+import { convertTreeToCategories, resetCategoriesTreePriority } from "./utils";
 
 const creationModal = ref(false);
 
@@ -32,7 +25,7 @@ const { categories, categoriesTree, isLoading, handleFetchCategories } =
 
 const batchUpdating = ref(false);
 
-const handleUpdateInBatch = useDebounceFn(async () => {
+async function handleUpdateInBatch() {
   const categoriesTreeToUpdate = resetCategoriesTreePriority(
     categoriesTree.value
   );
@@ -40,9 +33,20 @@ const handleUpdateInBatch = useDebounceFn(async () => {
   try {
     batchUpdating.value = true;
     const promises = categoriesToUpdate.map((category) =>
-      apiClient.extension.category.updateContentHaloRunV1alpha1Category({
+      coreApiClient.content.category.patchCategory({
         name: category.metadata.name,
-        category: category,
+        jsonPatchInner: [
+          {
+            op: "add",
+            path: "/spec/children",
+            value: category.spec.children || [],
+          },
+          {
+            op: "add",
+            path: "/spec/priority",
+            value: category.spec.priority || 0,
+          },
+        ],
       })
     );
     await Promise.all(promises);
@@ -52,13 +56,13 @@ const handleUpdateInBatch = useDebounceFn(async () => {
     await handleFetchCategories();
     batchUpdating.value = false;
   }
-}, 300);
+}
 </script>
 <template>
   <CategoryEditingModal v-if="creationModal" @close="creationModal = false" />
   <VPageHeader :title="$t('core.post_category.title')">
     <template #icon>
-      <IconBookRead class="mr-2 self-center" />
+      <IconBookRead />
     </template>
 
     <template #actions>
@@ -68,7 +72,7 @@ const handleUpdateInBatch = useDebounceFn(async () => {
         @click="creationModal = true"
       >
         <template #icon>
-          <IconAddCircle class="h-full w-full" />
+          <IconAddCircle />
         </template>
         {{ $t("core.common.buttons.new") }}
       </VButton>
@@ -106,11 +110,11 @@ const handleUpdateInBatch = useDebounceFn(async () => {
               </VButton>
               <VButton
                 v-permission="['system:posts:manage']"
-                type="primary"
+                type="secondary"
                 @click="creationModal = true"
               >
                 <template #icon>
-                  <IconAddCircle class="h-full w-full" />
+                  <IconAddCircle />
                 </template>
                 {{ $t("core.common.buttons.new") }}
               </VButton>
@@ -119,14 +123,32 @@ const handleUpdateInBatch = useDebounceFn(async () => {
         </VEmpty>
       </Transition>
       <Transition v-else appear name="fade">
-        <CategoryListItem
+        <Draggable
           v-model="categoriesTree"
           :class="{
             'cursor-progress opacity-60': batchUpdating,
           }"
-          @change="handleUpdateInBatch"
-        />
+          :disable-drag="batchUpdating"
+          trigger-class="drag-element"
+          :indent="40"
+          @after-drop="handleUpdateInBatch"
+        >
+          <template #default="{ node, stat }">
+            <CategoryListItem
+              :category-tree-node="node"
+              :is-child-level="stat.level > 1"
+            />
+          </template>
+        </Draggable>
       </Transition>
     </VCard>
   </div>
 </template>
+<style scoped>
+:deep(.vtlist-inner) {
+  @apply divide-y divide-gray-100;
+}
+:deep(.he-tree-drag-placeholder) {
+  height: 60px;
+}
+</style>

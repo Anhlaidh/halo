@@ -5,13 +5,18 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static run.halo.app.infra.exception.Exceptions.createErrorResponse;
 import static run.halo.app.security.authentication.WebExchangeMatchers.ignoringMediaTypeAll;
 
+import java.net.URI;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.CredentialsContainer;
+import org.springframework.security.web.server.DefaultServerRedirectStrategy;
+import org.springframework.security.web.server.ServerRedirectStrategy;
 import org.springframework.security.web.server.WebFilterExchange;
-import org.springframework.security.web.server.authentication.RedirectServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationFailureHandler;
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
@@ -20,7 +25,10 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
-import run.halo.app.security.authentication.rememberme.RememberMeServices;
+import run.halo.app.security.LoginHandlerEnhancer;
+import run.halo.app.security.authentication.exception.TooManyRequestsException;
+import run.halo.app.security.authentication.rememberme.RememberMeRequestCache;
+import run.halo.app.security.authentication.rememberme.WebSessionRememberMeRequestCache;
 import run.halo.app.security.authentication.twofactor.TwoFactorAuthentication;
 
 @Slf4j
@@ -31,33 +39,45 @@ public class UsernamePasswordHandler implements ServerAuthenticationSuccessHandl
 
     private final MessageSource messageSource;
 
-    private final RememberMeServices rememberMeServices;
+    private final LoginHandlerEnhancer loginHandlerEnhancer;
 
-    private final ServerAuthenticationFailureHandler defaultFailureHandler =
-        new RedirectServerAuthenticationFailureHandler("/console?error#/login");
+    private final ServerRedirectStrategy redirectStrategy = new DefaultServerRedirectStrategy();
+
+    @Setter
+    private RememberMeRequestCache rememberMeRequestCache = new WebSessionRememberMeRequestCache();
 
     private final ServerAuthenticationSuccessHandler defaultSuccessHandler =
-        new RedirectServerAuthenticationSuccessHandler("/console/");
+        new RedirectServerAuthenticationSuccessHandler("/uc");
 
     public UsernamePasswordHandler(ServerResponse.Context context, MessageSource messageSource,
-        RememberMeServices rememberMeServices) {
+        LoginHandlerEnhancer loginHandlerEnhancer) {
         this.context = context;
         this.messageSource = messageSource;
-        this.rememberMeServices = rememberMeServices;
+        this.loginHandlerEnhancer = loginHandlerEnhancer;
     }
 
     @Override
     public Mono<Void> onAuthenticationFailure(WebFilterExchange webFilterExchange,
         AuthenticationException exception) {
         var exchange = webFilterExchange.getExchange();
-        return rememberMeServices.loginFail(exchange)
+        return loginHandlerEnhancer.onLoginFailure(exchange, exception)
             .then(ignoringMediaTypeAll(APPLICATION_JSON)
                 .matches(exchange)
                 .filter(ServerWebExchangeMatcher.MatchResult::isMatch)
-                .switchIfEmpty(
-                    defaultFailureHandler.onAuthenticationFailure(webFilterExchange, exception)
-                        // Skip the handleAuthenticationException.
-                        .then(Mono.empty())
+                .switchIfEmpty(Mono.defer(
+                    () -> {
+                        var location = URI.create("/login?error&method=local");
+                        if (exception instanceof DisabledException) {
+                            location = URI.create("/login?error=account-disabled&method=local");
+                        }
+                        if (exception instanceof BadCredentialsException) {
+                            location = URI.create("/login?error=invalid-credential&method=local");
+                        }
+                        if (exception instanceof TooManyRequestsException) {
+                            location = URI.create("/login?error=rate-limit-exceeded&method=local");
+                        }
+                        return redirectStrategy.sendRedirect(exchange, location);
+                    }).then(Mono.empty())
                 )
                 .flatMap(matchResult -> handleAuthenticationException(exception, exchange)));
     }
@@ -66,9 +86,12 @@ public class UsernamePasswordHandler implements ServerAuthenticationSuccessHandl
     public Mono<Void> onAuthenticationSuccess(WebFilterExchange webFilterExchange,
         Authentication authentication) {
         if (authentication instanceof TwoFactorAuthentication) {
-            // continue filtering for authorization
-            return rememberMeServices.loginSuccess(webFilterExchange.getExchange(), authentication)
-                .then(webFilterExchange.getChain().filter(webFilterExchange.getExchange()));
+            return rememberMeRequestCache.saveRememberMe(webFilterExchange.getExchange())
+                // Do not use RedirectServerAuthenticationSuccessHandler to redirect
+                // because it will use request cache to redirect
+                .then(redirectStrategy.sendRedirect(webFilterExchange.getExchange(),
+                    URI.create("/challenges/two-factor/totp"))
+                );
         }
 
         if (authentication instanceof CredentialsContainer container) {
@@ -84,7 +107,7 @@ public class UsernamePasswordHandler implements ServerAuthenticationSuccessHandl
         };
 
         var exchange = webFilterExchange.getExchange();
-        return rememberMeServices.loginSuccess(exchange, authentication)
+        return loginHandlerEnhancer.onLoginSuccess(webFilterExchange.getExchange(), authentication)
             .then(xhrMatcher.matches(exchange)
                 .filter(ServerWebExchangeMatcher.MatchResult::isMatch)
                 .switchIfEmpty(Mono.defer(

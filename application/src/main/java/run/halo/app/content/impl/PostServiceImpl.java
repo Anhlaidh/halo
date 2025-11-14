@@ -1,12 +1,14 @@
 package run.halo.app.content.impl;
 
-import static run.halo.app.extension.index.query.QueryFactory.in;
+import static run.halo.app.extension.index.query.Queries.in;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -15,11 +17,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.server.ServerWebInputException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 import run.halo.app.content.AbstractContentService;
+import run.halo.app.content.CategoryService;
 import run.halo.app.content.ContentRequest;
 import run.halo.app.content.ContentWrapper;
 import run.halo.app.content.Contributor;
@@ -29,21 +33,21 @@ import run.halo.app.content.PostQuery;
 import run.halo.app.content.PostRequest;
 import run.halo.app.content.PostService;
 import run.halo.app.content.Stats;
+import run.halo.app.core.counter.CounterService;
+import run.halo.app.core.counter.MeterUtils;
 import run.halo.app.core.extension.content.Category;
 import run.halo.app.core.extension.content.Post;
 import run.halo.app.core.extension.content.Snapshot;
 import run.halo.app.core.extension.content.Tag;
-import run.halo.app.core.extension.service.UserService;
+import run.halo.app.core.user.service.UserService;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
-import run.halo.app.extension.PageRequestImpl;
+import run.halo.app.extension.MetadataOperator;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.extension.Ref;
 import run.halo.app.extension.router.selector.FieldSelector;
 import run.halo.app.infra.Condition;
 import run.halo.app.infra.ConditionStatus;
-import run.halo.app.metrics.CounterService;
-import run.halo.app.metrics.MeterUtils;
 
 /**
  * A default implementation of {@link PostService}.
@@ -57,29 +61,52 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
     private final ReactiveExtensionClient client;
     private final CounterService counterService;
     private final UserService userService;
+    private final CategoryService categoryService;
 
     public PostServiceImpl(ReactiveExtensionClient client, CounterService counterService,
-        UserService userService) {
+        UserService userService, CategoryService categoryService) {
         super(client);
         this.client = client;
         this.counterService = counterService;
         this.userService = userService;
+        this.categoryService = categoryService;
     }
 
     @Override
     public Mono<ListResult<ListedPost>> listPost(PostQuery query) {
-        return client.listBy(Post.class, query.toListOptions(),
-                PageRequestImpl.of(query.getPage(), query.getSize(), query.getSort())
+        return buildListOptions(query)
+            .flatMap(listOptions ->
+                client.listBy(Post.class, listOptions, query.toPageRequest())
             )
             .flatMap(listResult -> Flux.fromStream(listResult.get())
                 .map(this::getListedPost)
-                .concatMap(Function.identity())
+                .flatMapSequential(Function.identity())
                 .collectList()
                 .map(listedPosts -> new ListResult<>(listResult.getPage(), listResult.getSize(),
                     listResult.getTotal(), listedPosts)
                 )
                 .defaultIfEmpty(ListResult.emptyResult())
             );
+    }
+
+    Mono<ListOptions> buildListOptions(PostQuery query) {
+        var categoryName = query.getCategoryWithChildren();
+        if (categoryName == null) {
+            return Mono.just(query.toListOptions());
+        }
+        return categoryService.listChildren(categoryName)
+            .collectList()
+            .map(categories -> {
+                var categoryNames = categories.stream()
+                    .map(Category::getMetadata)
+                    .map(MetadataOperator::getName)
+                    .toList();
+                var listOptions = query.toListOptions();
+                var newFiledSelector = listOptions.getFieldSelector()
+                    .andQuery(in("spec.categories", categoryNames));
+                listOptions.setFieldSelector(newFiledSelector);
+                return listOptions;
+            });
     }
 
     Mono<Stats> fetchStats(Post post) {
@@ -129,7 +156,7 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
     }
 
     private Flux<Tag> listTags(List<String> tagNames) {
-        if (tagNames == null) {
+        if (CollectionUtils.isEmpty(tagNames)) {
             return Flux.empty();
         }
         var listOptions = new ListOptions();
@@ -137,21 +164,25 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
         return client.listAll(Tag.class, listOptions, Sort.by("metadata.creationTimestamp"));
     }
 
-    private Flux<Category> listCategories(List<String> categoryNames) {
-        if (categoryNames == null) {
+    @Override
+    public Flux<Category> listCategories(List<String> categoryNames) {
+        if (CollectionUtils.isEmpty(categoryNames)) {
             return Flux.empty();
         }
+        ToIntFunction<Category> comparator =
+            category -> categoryNames.indexOf(category.getMetadata().getName());
         var listOptions = new ListOptions();
         listOptions.setFieldSelector(FieldSelector.of(in("metadata.name", categoryNames)));
-        return client.listAll(Category.class, listOptions, Sort.by("metadata.creationTimestamp"));
+        return client.listAll(Category.class, listOptions, Sort.unsorted())
+            .sort(Comparator.comparingInt(comparator));
     }
 
     private Flux<Contributor> listContributors(List<String> usernames) {
-        if (usernames == null) {
+        if (CollectionUtils.isEmpty(usernames)) {
             return Flux.empty();
         }
         return Flux.fromIterable(usernames)
-            .concatMap(userService::getUserOrGhost)
+            .flatMapSequential(userService::getUserOrGhost)
             .map(user -> {
                 Contributor contributor = new Contributor();
                 contributor.setName(user.getMetadata().getName());
@@ -353,6 +384,15 @@ public class PostServiceImpl extends AbstractContentService implements PostServi
                     .flatMap(client::delete)
                     .flatMap(deleted -> restoredContent(baseSnapshotName, deleted));
             });
+    }
+
+    @Override
+    public Mono<Post> recycleBy(String postName, String username) {
+        return getByUsername(postName, username)
+            .flatMap(post -> updatePostWithRetry(post, record -> {
+                record.getSpec().setDeleted(true);
+                return record;
+            }));
     }
 
     private Mono<Post> updatePostWithRetry(Post post, UnaryOperator<Post> func) {

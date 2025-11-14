@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import type { Menu } from "@halo-dev/api-client";
+import { consoleApiClient, coreApiClient } from "@halo-dev/api-client";
 import {
   Dialog,
   Toast,
@@ -7,22 +9,23 @@ import {
   VDropdownItem,
   VEmpty,
   VEntity,
+  VEntityContainer,
   VEntityField,
   VLoading,
-  VSpace,
   VStatusDot,
   VTag,
 } from "@halo-dev/components";
-import MenuEditingModal from "./MenuEditingModal.vue";
-import { onMounted, ref } from "vue";
-import type { Menu } from "@halo-dev/api-client";
-import { apiClient } from "@/utils/api-client";
-import { useRouteQuery } from "@vueuse/router";
-import { usePermission } from "@/utils/permission";
-import { useI18n } from "vue-i18n";
+import { utils } from "@halo-dev/ui-shared";
 import { useQuery } from "@tanstack/vue-query";
+import { useRouteQuery } from "@vueuse/router";
+import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import MenuEditingModal from "./MenuEditingModal.vue";
 
-const { currentUserHasPermission } = usePermission();
+interface SystemMenuConfig {
+  primary: string;
+}
+
 const { t } = useI18n();
 
 const props = withDefaults(
@@ -48,7 +51,7 @@ const {
 } = useQuery<Menu[]>({
   queryKey: ["menus"],
   queryFn: async () => {
-    const { data } = await apiClient.extension.menu.listV1alpha1Menu({
+    const { data } = await coreApiClient.menu.listMenu({
       page: 0,
       size: 0,
     });
@@ -65,10 +68,10 @@ const {
     }
   },
   refetchInterval(data) {
-    const deletingMenus = data?.filter(
+    const hasDeletingMenu = data?.some(
       (menu) => !!menu.metadata.deletionTimestamp
     );
-    return deletingMenus?.length ? 1000 : false;
+    return hasDeletingMenu ? 1000 : false;
   },
 });
 
@@ -87,12 +90,12 @@ const handleDeleteMenu = async (menu: Menu) => {
     cancelText: t("core.common.buttons.cancel"),
     onConfirm: async () => {
       try {
-        await apiClient.extension.menu.deleteV1alpha1Menu({
+        await coreApiClient.menu.deleteMenu({
           name: menu.metadata.name,
         });
 
         const deleteItemsPromises = menu.spec.menuItems?.map((item) =>
-          apiClient.extension.menuItem.deleteV1alpha1MenuItem({
+          coreApiClient.menuItem.deleteMenuItem({
             name: item,
           })
         );
@@ -138,36 +141,25 @@ onMounted(async () => {
 const { data: primaryMenuName, refetch: refetchPrimaryMenuName } = useQuery({
   queryKey: ["primary-menu-name"],
   queryFn: async () => {
-    const { data } = await apiClient.extension.configMap.getV1alpha1ConfigMap({
-      name: "system",
-    });
+    const { data } =
+      await consoleApiClient.configMap.system.getSystemConfigByGroup({
+        group: "menu",
+      });
 
-    if (!data.data?.menu) {
-      return "";
-    }
+    const { primary } = (data as SystemMenuConfig) || {};
 
-    const menuConfig = JSON.parse(data.data.menu);
-
-    return menuConfig.primary;
+    return primary;
   },
 });
 
 const handleSetPrimaryMenu = async (menu: Menu) => {
-  const { data: systemConfigMap } =
-    await apiClient.extension.configMap.getV1alpha1ConfigMap({
-      name: "system",
-    });
+  await consoleApiClient.configMap.system.updateSystemConfigByGroup({
+    group: "menu",
+    body: {
+      primary: menu.metadata.name,
+    },
+  });
 
-  if (systemConfigMap.data) {
-    const menuConfigToUpdate = JSON.parse(systemConfigMap.data?.menu || "{}");
-    menuConfigToUpdate.primary = menu.metadata.name;
-    systemConfigMap.data["menu"] = JSON.stringify(menuConfigToUpdate);
-
-    await apiClient.extension.configMap.updateV1alpha1ConfigMap({
-      name: "system",
-      configMap: systemConfigMap,
-    });
-  }
   await refetchPrimaryMenuName();
 
   Toast.success(t("core.menu.operations.set_primary.toast_success"));
@@ -188,70 +180,72 @@ const handleSetPrimaryMenu = async (menu: Menu) => {
         :title="$t('core.menu.empty.title')"
       >
         <template #actions>
-          <VSpace>
-            <VButton size="sm" @click="refetch()">
-              {{ $t("core.common.buttons.refresh") }}
-            </VButton>
-          </VSpace>
+          <VButton size="sm" @click="refetch()">
+            {{ $t("core.common.buttons.refresh") }}
+          </VButton>
         </template>
       </VEmpty>
     </Transition>
     <Transition v-else appear name="fade">
-      <ul class="box-border h-full w-full divide-y divide-gray-100" role="list">
-        <li
-          v-for="(menu, index) in menus"
-          :key="index"
+      <VEntityContainer>
+        <VEntity
+          v-for="menu in menus"
+          :key="menu.metadata.name"
+          :is-selected="selectedMenu?.metadata.name === menu.metadata.name"
           @click="handleSelect(menu)"
         >
-          <VEntity
-            :is-selected="selectedMenu?.metadata.name === menu.metadata.name"
-          >
-            <template #start>
-              <VEntityField
-                :title="menu.spec?.displayName"
-                :description="
-                  $t('core.menu.list.fields.items_count', {
-                    count: menu.spec.menuItems?.length || 0,
-                  })
-                "
-              >
-                <template v-if="menu.metadata.name === primaryMenuName" #extra>
-                  <VTag>
-                    {{ $t("core.menu.list.fields.primary") }}
-                  </VTag>
-                </template>
-              </VEntityField>
-            </template>
-            <template #end>
-              <VEntityField v-if="menu.metadata.deletionTimestamp">
-                <template #description>
-                  <VStatusDot
-                    v-tooltip="$t('core.common.status.deleting')"
-                    state="warning"
-                    animate
-                  />
-                </template>
-              </VEntityField>
-            </template>
-            <template
-              v-if="currentUserHasPermission(['system:menus:manage'])"
-              #dropdownItems
+          <template #start>
+            <VEntityField
+              :title="menu.spec?.displayName"
+              :description="
+                $t('core.menu.list.fields.items_count', {
+                  count: menu.spec.menuItems?.length || 0,
+                })
+              "
             >
-              <VDropdownItem @click="handleSetPrimaryMenu(menu)">
-                {{ $t("core.menu.operations.set_primary.button") }}
-              </VDropdownItem>
-              <VDropdownItem @click="handleOpenEditingModal(menu)">
-                {{ $t("core.common.buttons.edit") }}
-              </VDropdownItem>
-              <VDropdownItem type="danger" @click="handleDeleteMenu(menu)">
-                {{ $t("core.common.buttons.delete") }}
-              </VDropdownItem>
-            </template>
-          </VEntity>
-        </li>
-      </ul>
+              <template v-if="menu.metadata.name === primaryMenuName" #extra>
+                <VTag>
+                  {{ $t("core.menu.list.fields.primary") }}
+                </VTag>
+              </template>
+            </VEntityField>
+          </template>
+          <template #end>
+            <VEntityField v-if="menu.metadata.deletionTimestamp">
+              <template #description>
+                <VStatusDot
+                  v-tooltip="$t('core.common.status.deleting')"
+                  state="warning"
+                  animate
+                />
+              </template>
+            </VEntityField>
+          </template>
+          <template
+            v-if="utils.permission.has(['system:menus:manage'])"
+            #dropdownItems
+          >
+            <VDropdownItem
+              v-if="primaryMenuName !== menu.metadata.name"
+              @click="handleSetPrimaryMenu(menu)"
+            >
+              {{ $t("core.menu.operations.set_primary.button") }}
+            </VDropdownItem>
+            <VDropdownItem @click="handleOpenEditingModal(menu)">
+              {{ $t("core.common.buttons.edit") }}
+            </VDropdownItem>
+            <VDropdownItem
+              :disabled="primaryMenuName === menu.metadata.name"
+              type="danger"
+              @click="handleDeleteMenu(menu)"
+            >
+              {{ $t("core.common.buttons.delete") }}
+            </VDropdownItem>
+          </template>
+        </VEntity>
+      </VEntityContainer>
     </Transition>
-    <template v-if="currentUserHasPermission(['system:menus:manage'])" #footer>
+    <template v-if="utils.permission.has(['system:menus:manage'])" #footer>
       <VButton block type="secondary" @click="handleOpenEditingModal()">
         {{ $t("core.common.buttons.new") }}
       </VButton>

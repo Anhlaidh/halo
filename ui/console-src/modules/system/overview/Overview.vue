@@ -1,15 +1,12 @@
 <script lang="ts" setup>
-import type { GlobalInfo, Info, Startup } from "@/types";
-import { apiClient } from "@/utils/api-client";
-import { formatDatetime } from "@/utils/date";
-import { usePermission } from "@/utils/permission";
+import H2WarningAlert from "@/components/alerts/H2WarningAlert.vue";
 import { useThemeStore } from "@console/stores/theme";
 import type { Plugin } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
 import {
   IconClipboardLine,
   IconTerminalBoxLine,
   Toast,
-  VAlert,
   VButton,
   VCard,
   VDescription,
@@ -18,15 +15,18 @@ import {
   VPageHeader,
   VTag,
 } from "@halo-dev/components";
+import type { Info, Startup } from "@halo-dev/ui-shared";
+import { stores, utils } from "@halo-dev/ui-shared";
 import { useQuery } from "@tanstack/vue-query";
 import { useClipboard } from "@vueuse/core";
 import axios from "axios";
+import { storeToRefs } from "pinia";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import ExternalUrlItem from "./components/ExternalUrlItem.vue";
 
 const { t } = useI18n();
 const themeStore = useThemeStore();
-const { currentUserHasPermission } = usePermission();
 
 const { data: info } = useQuery<Info>({
   queryKey: ["system-info"],
@@ -39,16 +39,7 @@ const { data: info } = useQuery<Info>({
   retry: 0,
 });
 
-const { data: globalInfo } = useQuery<GlobalInfo>({
-  queryKey: ["system-global-info"],
-  queryFn: async () => {
-    const { data } = await axios.get<GlobalInfo>(`/actuator/globalinfo`, {
-      withCredentials: true,
-    });
-    return data;
-  },
-  retry: 0,
-});
+const { globalInfo } = storeToRefs(stores.globalInfo());
 
 const { data: startup } = useQuery<Startup>({
   queryKey: ["system-startup-info"],
@@ -64,7 +55,7 @@ const { data: startup } = useQuery<Startup>({
 const { data: plugins, isLoading: isPluginsLoading } = useQuery<Plugin[]>({
   queryKey: ["enabled-plugins"],
   queryFn: async () => {
-    const { data } = await apiClient.plugin.listPlugins({
+    const { data } = await consoleApiClient.plugin.plugin.listPlugins({
       page: 0,
       size: 0,
       enabled: true,
@@ -72,21 +63,7 @@ const { data: plugins, isLoading: isPluginsLoading } = useQuery<Plugin[]>({
 
     return data.items;
   },
-  enabled: computed(() => currentUserHasPermission(["system:plugins:view"])),
-});
-
-const isExternalUrlValid = computed(() => {
-  if (!globalInfo.value?.useAbsolutePermalink) {
-    return true;
-  }
-
-  if (!globalInfo.value?.externalUrl) {
-    return true;
-  }
-
-  const url = new URL(globalInfo.value.externalUrl);
-  const { host: currentHost, protocol: currentProtocol } = window.location;
-  return url.host === currentHost && url.protocol === currentProtocol;
+  enabled: computed(() => utils.permission.has(["system:plugins:view"])),
 });
 
 // copy system information to clipboard
@@ -112,7 +89,7 @@ const handleCopy = () => {
     },
     {
       label: t("core.overview.fields.start_time"),
-      value: formatDatetime(startup.value?.timeline.startTime) || "",
+      value: utils.date.format(startup.value?.timeline.startTime) || "",
     },
     {
       label: t("core.overview.fields.version"),
@@ -120,7 +97,7 @@ const handleCopy = () => {
     },
     {
       label: t("core.overview.fields.build_time"),
-      value: formatDatetime(info.value?.build?.time) || "",
+      value: utils.date.format(info.value?.build?.time) || "",
     },
     {
       label: "Git Commit",
@@ -198,7 +175,7 @@ const handleDownloadLogfile = () => {
       const downloadElement = document.createElement("a");
       const href = window.URL.createObjectURL(blob);
       downloadElement.href = href;
-      downloadElement.download = `halo-log-${formatDatetime(new Date())}.log`;
+      downloadElement.download = `halo-log-${utils.date.format(new Date())}.log`;
       document.body.appendChild(downloadElement);
       downloadElement.click();
       document.body.removeChild(downloadElement);
@@ -216,12 +193,12 @@ const handleDownloadLogfile = () => {
 <template>
   <VPageHeader :title="$t('core.overview.title')">
     <template #icon>
-      <IconTerminalBoxLine class="mr-2 self-center" />
+      <IconTerminalBoxLine />
     </template>
     <template #actions>
       <VButton size="sm" @click="handleCopy">
         <template #icon>
-          <IconClipboardLine class="h-full w-full" />
+          <IconClipboardLine />
         </template>
         {{ $t("core.common.buttons.copy") }}
       </VButton>
@@ -242,29 +219,11 @@ const handleDownloadLogfile = () => {
         </div>
         <div class="border-t border-gray-200">
           <VDescription>
-            <VDescriptionItem :label="$t('core.overview.fields.external_url')">
-              <span v-if="globalInfo?.externalUrl">
-                {{ globalInfo?.externalUrl }}
-              </span>
-              <span v-else>
-                {{ $t("core.overview.fields_values.external_url.not_setup") }}
-              </span>
-              <VAlert
-                v-if="!isExternalUrlValid"
-                class="mt-3"
-                type="warning"
-                :title="$t('core.common.text.warning')"
-                :closable="false"
-              >
-                <template #description>
-                  {{ $t("core.overview.alert.external_url_invalid") }}
-                </template>
-              </VAlert>
-            </VDescriptionItem>
+            <ExternalUrlItem />
             <VDescriptionItem
               v-if="startup?.timeline.startTime"
               :label="$t('core.overview.fields.start_time')"
-              :content="formatDatetime(startup?.timeline.startTime)"
+              :content="utils.date.format(startup?.timeline.startTime)"
             />
             <VDescriptionItem
               v-if="themeStore.activatedTheme"
@@ -343,7 +302,7 @@ const handleDownloadLogfile = () => {
             <VDescriptionItem
               v-if="info.build"
               :label="$t('core.overview.fields.build_time')"
-              :content="formatDatetime(info.build.time)"
+              :content="utils.date.format(info.build.time)"
             />
             <VDescriptionItem v-if="info.git" label="Git Commit">
               <a
@@ -364,17 +323,7 @@ const handleDownloadLogfile = () => {
               <span>
                 {{ [info.database.name, info.database.version].join(" / ") }}
               </span>
-              <VAlert
-                v-if="info.database.name.startsWith('H2')"
-                class="mt-3"
-                type="warning"
-                :title="$t('core.common.text.warning')"
-                :closable="false"
-              >
-                <template #description>
-                  {{ $t("core.overview.alert.h2_warning") }}
-                </template>
-              </VAlert>
+              <H2WarningAlert class="mt-3" />
             </VDescriptionItem>
             <VDescriptionItem :label="$t('core.overview.fields.os')">
               {{ info.os.name }} {{ info.os.version }} / {{ info.os.arch }}

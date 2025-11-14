@@ -11,6 +11,8 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import run.halo.app.infra.SecureServerRequest;
+import run.halo.app.infra.exception.PluginRuntimeIncompatibleException;
 
 /**
  * A composite {@link RouterFunction} implementation for plugin.
@@ -31,8 +33,21 @@ public class DefaultPluginRouterFunctionRegistry
     @Override
     @NonNull
     public Mono<HandlerFunction<ServerResponse>> route(@NonNull ServerRequest request) {
+        var secureRequest = new SecureServerRequest(request);
         return Flux.fromIterable(this.routerFunctions)
-            .concatMap(routerFunction -> routerFunction.route(request))
+            .concatMap(routerFunction -> {
+                // wrap the handler function
+                return routerFunction.route(secureRequest)
+                    .map(hf -> (HandlerFunction<ServerResponse>)
+                        serverRequest -> {
+                            try {
+                                return hf.handle(secureRequest);
+                            } catch (LinkageError le) {
+                                return Mono.error(new PluginRuntimeIncompatibleException(le));
+                            }
+                        }
+                    );
+            })
             .next();
     }
 

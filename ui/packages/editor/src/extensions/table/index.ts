@@ -1,43 +1,47 @@
-import TiptapTable, {
-  type TableOptions,
-  createColGroup,
-} from "@tiptap/extension-table";
+import { BlockActionSeparator, ToolboxItem } from "@/components";
+import { CONVERT_TO_KEY } from "@/components/drag/default-drag";
+import { i18n } from "@/locales";
 import {
-  isActive,
-  type Editor,
-  type Range,
-  mergeAttributes,
-  isNodeActive,
-  CoreEditor,
+  Editor,
   findParentNode,
+  isActive,
+  isNodeActive,
+  mergeAttributes,
+  posToDOMRect,
+  type Range,
 } from "@/tiptap";
 import {
-  type Node as ProseMirrorNode,
-  type NodeView,
-  type EditorState,
-  type DOMOutputSpec,
+  PluginKey,
   TextSelection,
+  type DOMOutputSpec,
+  type EditorState,
+  type NodeView,
+  type Node as ProseMirrorNode,
+  type ViewMutationRecord,
 } from "@/tiptap/pm";
-import TableCell from "./table-cell";
-import TableRow from "./table-row";
-import TableHeader from "./table-header";
+import type { ExtensionOptions, NodeBubbleMenuType } from "@/types";
+import {
+  createColGroup,
+  Table as TiptapTable,
+  type TableOptions,
+} from "@tiptap/extension-table";
+import { markRaw } from "vue";
+import FluentTableColumnTopBottom24Regular from "~icons/fluent/table-column-top-bottom-24-regular";
 import MdiTable from "~icons/mdi/table";
-import MdiTablePlus from "~icons/mdi/table-plus";
-import MdiTableColumnPlusBefore from "~icons/mdi/table-column-plus-before";
 import MdiTableColumnPlusAfter from "~icons/mdi/table-column-plus-after";
-import MdiTableRowPlusAfter from "~icons/mdi/table-row-plus-after";
-import MdiTableRowPlusBefore from "~icons/mdi/table-row-plus-before";
+import MdiTableColumnPlusBefore from "~icons/mdi/table-column-plus-before";
 import MdiTableColumnRemove from "~icons/mdi/table-column-remove";
-import MdiTableRowRemove from "~icons/mdi/table-row-remove";
-import MdiTableRemove from "~icons/mdi/table-remove";
 import MdiTableHeadersEye from "~icons/mdi/table-headers-eye";
 import MdiTableMergeCells from "~icons/mdi/table-merge-cells";
+import MdiTablePlus from "~icons/mdi/table-plus";
+import MdiTableRemove from "~icons/mdi/table-remove";
+import MdiTableRowPlusAfter from "~icons/mdi/table-row-plus-after";
+import MdiTableRowPlusBefore from "~icons/mdi/table-row-plus-before";
+import MdiTableRowRemove from "~icons/mdi/table-row-remove";
 import MdiTableSplitCell from "~icons/mdi/table-split-cell";
-import FluentTableColumnTopBottom24Regular from "~icons/fluent/table-column-top-bottom-24-regular";
-import { markRaw } from "vue";
-import { i18n } from "@/locales";
-import type { ExtensionOptions, NodeBubbleMenu } from "@/types";
-import { BlockActionSeparator, ToolboxItem } from "@/components";
+import TableCell from "./table-cell";
+import TableHeader from "./table-header";
+import TableRow from "./table-row";
 import {
   findNextCell,
   findPreviousCell,
@@ -53,6 +57,7 @@ function updateColumns(
   table: HTMLElement,
   cellMinWidth: number,
   overrideCol?: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   overrideValue?: any
 ) {
   let totalWidth = 0;
@@ -104,7 +109,7 @@ function updateColumns(
   }
 }
 
-let editor: CoreEditor | undefined = undefined;
+let editor: Editor | undefined = undefined;
 
 class TableView implements NodeView {
   node: ProseMirrorNode;
@@ -185,9 +190,7 @@ class TableView implements NodeView {
     }
   }
 
-  ignoreMutation(
-    mutation: MutationRecord | { type: "selection"; target: Element }
-  ) {
+  ignoreMutation(mutation: ViewMutationRecord) {
     return (
       mutation.type === "attributes" &&
       (mutation.target === this.table ||
@@ -207,7 +210,11 @@ class TableView implements NodeView {
   }
 }
 
-const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
+export const TABLE_BUBBLE_MENU_KEY = new PluginKey("tableBubbleMenu");
+
+const Table = TiptapTable.extend<ExtensionOptions & Partial<TableOptions>>({
+  allowGapCursor: true,
+
   addExtensions() {
     return [TableCell, TableRow, TableHeader];
   },
@@ -218,12 +225,12 @@ const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
       resizable: true,
       handleWidth: 5,
       cellMinWidth: 25,
-      View: TableView as unknown as NodeView,
+      View: TableView,
       lastColumnResizable: true,
       allowTableNodeSelection: false,
       getToolboxItems({ editor }: { editor: Editor }) {
         return {
-          priority: 15,
+          priority: 40,
           component: markRaw(ToolboxItem),
           props: {
             editor,
@@ -254,28 +261,35 @@ const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
           },
         };
       },
-      getBubbleMenu({ editor }): NodeBubbleMenu {
+      getBubbleMenu({ editor }): NodeBubbleMenuType {
         return {
-          pluginKey: "tableBubbleMenu",
+          pluginKey: TABLE_BUBBLE_MENU_KEY,
           shouldShow: ({ state }: { state: EditorState }): boolean => {
             return isActive(state, Table.name);
           },
-          getRenderContainer(node) {
-            let container = node;
-            if (container.nodeName === "#text") {
-              container = node.parentElement as HTMLElement;
-            }
-            while (
-              container &&
-              container.classList &&
-              !container.classList.contains("tableWrapper")
-            ) {
-              container = container.parentElement as HTMLElement;
-            }
-            return container;
+          options: {
+            placement: "bottom-start",
           },
-          tippyOptions: {
-            offset: [26, 0],
+          getReferencedVirtualElement() {
+            const editor = this.editor;
+            if (!editor) {
+              return null;
+            }
+            const parentNode = findParentNode(
+              (node) => node.type.name === Table.name
+            )(editor.state.selection);
+            if (parentNode) {
+              const domRect = posToDOMRect(
+                editor.view,
+                parentNode.start,
+                parentNode.start + parentNode.node.nodeSize - 2
+              );
+              return {
+                getBoundingClientRect: () => domRect,
+                getClientRects: () => [domRect],
+              };
+            }
+            return null;
           },
           items: [
             {
@@ -395,52 +409,14 @@ const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
           ],
         };
       },
-      getDraggable() {
+      getDraggableMenuItems() {
         return {
-          getRenderContainer({ dom }) {
-            let container = dom;
-            while (container && !container.classList.contains("tableWrapper")) {
-              container = container.parentElement as HTMLElement;
+          extendsKey: CONVERT_TO_KEY,
+          visible({ editor }) {
+            if (isActive(editor.state, "table")) {
+              return false;
             }
-            return {
-              el: container,
-              dragDomOffset: {
-                x: 20,
-                y: 20,
-              },
-            };
-          },
-          handleDrop({ view, event, slice, insertPos }) {
-            const { state } = view;
-            const $pos = state.selection.$anchor;
-            for (let d = $pos.depth; d > 0; d--) {
-              const node = $pos.node(d);
-              if (node.type.spec["tableRole"] == "table") {
-                const eventPos = view.posAtCoords({
-                  left: event.clientX,
-                  top: event.clientY,
-                });
-                if (!eventPos) {
-                  return;
-                }
-                if (!slice) {
-                  return;
-                }
-
-                let tr = state.tr;
-                tr = tr.delete($pos.before(d), $pos.after(d));
-                const pos = tr.mapping.map(insertPos);
-                tr = tr.replaceRange(pos, pos, slice).scrollIntoView();
-
-                if (tr) {
-                  view.dispatch(tr);
-                  event.preventDefault();
-                  return true;
-                }
-
-                return false;
-              }
-            }
+            return true;
           },
         };
       },
@@ -578,7 +554,7 @@ const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
   renderHTML({ node, HTMLAttributes }) {
     const { colgroup, tableWidth, tableMinWidth } = createColGroup(
       node,
-      this.options.cellMinWidth
+      this.options.cellMinWidth ?? 25
     );
 
     const table: DOMOutputSpec = [
@@ -586,11 +562,15 @@ const Table = TiptapTable.extend<ExtensionOptions & TableOptions>({
       { style: "overflow-x: auto; overflow-y: hidden;" },
       [
         "table",
-        mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-          style: tableWidth
-            ? `width: ${tableWidth}`
-            : `minWidth: ${tableMinWidth}`,
-        }),
+        mergeAttributes(
+          this.options.HTMLAttributes ?? {},
+          HTMLAttributes ?? {},
+          {
+            style: tableWidth
+              ? `width: ${tableWidth}`
+              : `minWidth: ${tableMinWidth}`,
+          }
+        ),
         colgroup,
         ["tbody", 0],
       ],

@@ -1,13 +1,19 @@
-import { definePlugin } from "@halo-dev/console-shared";
 import BasicLayout from "@console/layouts/BasicLayout.vue";
-import AttachmentList from "./AttachmentList.vue";
-import AttachmentSelectorModal from "./components/AttachmentSelectorModal.vue";
 import { IconFolder } from "@halo-dev/components";
-import { markRaw } from "vue";
+import { definePlugin } from "@halo-dev/ui-shared";
+import { defineAsyncComponent, markRaw } from "vue";
+
+declare module "vue" {
+  interface GlobalComponents {
+    AttachmentSelectorModal: (typeof import("./components/AttachmentSelectorModal.vue"))["default"];
+  }
+}
 
 export default definePlugin({
   components: {
-    AttachmentSelectorModal,
+    AttachmentSelectorModal: defineAsyncComponent(
+      () => import("./components/AttachmentSelectorModal.vue")
+    ),
   },
   routes: [
     {
@@ -29,7 +35,7 @@ export default definePlugin({
         {
           path: "",
           name: "Attachments",
-          component: AttachmentList,
+          component: () => import("./AttachmentList.vue"),
         },
       ],
     },

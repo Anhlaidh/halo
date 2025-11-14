@@ -1,19 +1,21 @@
 <script lang="ts" setup>
-import { Dashboard } from "@uppy/vue";
-import "@uppy/core/dist/style.css";
-import "@uppy/dashboard/dist/style.css";
+import { i18n } from "@/locales";
+import type { ProblemDetail } from "@/setup/setupApiClient";
+import { createHTMLContentModal } from "@/utils/modal";
+import { Toast } from "@halo-dev/components";
 import type { Restrictions } from "@uppy/core";
 import Uppy, { type SuccessResponse } from "@uppy/core";
-import XHRUpload from "@uppy/xhr-upload";
+import "@uppy/core/dist/style.css";
+import "@uppy/dashboard/dist/style.css";
 import ImageEditor from "@uppy/image-editor";
 import "@uppy/image-editor/dist/style.min.css";
+import en_US from "@uppy/locales/lib/en_US";
 import zh_CN from "@uppy/locales/lib/zh_CN";
 import zh_TW from "@uppy/locales/lib/zh_TW";
-import en_US from "@uppy/locales/lib/en_US";
-import { computed, onUnmounted } from "vue";
-import { Toast } from "@halo-dev/components";
-import type { ProblemDetail } from "@/utils/api-client";
-import { i18n } from "@/locales";
+import { Dashboard } from "@uppy/vue";
+import XHRUpload from "@uppy/xhr-upload";
+import objectHash from "object-hash";
+import { computed, h, onUnmounted } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -87,10 +89,44 @@ const uppy = computed(() => {
               return new Error(message);
             }
           }
-        } catch (e) {
+        } catch (_) {
           const responseBody = response as XMLHttpRequest;
           const { status, statusText } = responseBody;
           const defaultMessage = [status, statusText].join(": ");
+
+          // Catch error requests where the response is text/html,
+          // which usually comes from a reverse proxy or WAF
+          // fixme: Because there is no responseType in the response, we can only judge it in this way for now.
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(
+            responseBody.response,
+            "text/html"
+          );
+
+          if (
+            Array.from(doc.body.childNodes).some((node) => node.nodeType === 1)
+          ) {
+            createHTMLContentModal({
+              uniqueId: objectHash(responseBody.response || ""),
+              title: responseBody.status.toString(),
+              width: 700,
+              height: "calc(100vh - 20px)",
+              centered: true,
+              content: h("iframe", {
+                srcdoc: responseBody.response,
+                sandbox: "",
+                referrerpolicy: "no-referrer",
+                loading: "lazy",
+                style: {
+                  width: "100%",
+                  height: "100%",
+                },
+              }),
+            });
+
+            return new Error(defaultMessage);
+          }
+
           Toast.error(defaultMessage, { duration: 5000 });
           return new Error(defaultMessage);
         }

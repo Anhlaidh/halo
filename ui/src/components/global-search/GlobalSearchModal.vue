@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-import { type RouteLocationRaw, useRoute, useRouter } from "vue-router";
+import { useThemeStore } from "@console/stores/theme";
+import { consoleApiClient, coreApiClient } from "@halo-dev/api-client";
 import {
   IconBookRead,
   IconFolder,
@@ -8,24 +9,20 @@ import {
   IconPalette,
   IconSettings,
   IconUserSettings,
-  VEntity,
-  VEntityField,
   VModal,
 } from "@halo-dev/components";
-import { type Component, computed, markRaw, onMounted, ref, watch } from "vue";
-import Fuse from "fuse.js";
-import { apiClient } from "@/utils/api-client";
-import { usePermission } from "@/utils/permission";
-import { useThemeStore } from "@console/stores/theme";
-import { storeToRefs } from "pinia";
-import { useI18n } from "vue-i18n";
+import { utils } from "@halo-dev/ui-shared";
 import { useEventListener } from "@vueuse/core";
+import Fuse from "fuse.js";
+import { storeToRefs } from "pinia";
+import { computed, markRaw, onMounted, ref, watch, type Component } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute, useRouter, type RouteLocationRaw } from "vue-router";
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 
-const { currentUserHasPermission } = usePermission();
 const { activatedTheme } = storeToRefs(useThemeStore());
 
 const emit = defineEmits<{
@@ -78,19 +75,43 @@ const handleBuildSearchIndex = () => {
     });
   });
 
-  if (currentUserHasPermission(["system:users:view"])) {
-    apiClient.extension.user.listV1alpha1User().then((response) => {
-      response.data.items.forEach((user) => {
+  if (utils.permission.has(["system:users:view"])) {
+    coreApiClient.user
+      .listUser({
+        labelSelector: ["!halo.run/hidden-user"],
+      })
+      .then((response) => {
+        response.data.items.forEach((user) => {
+          fuse.add({
+            title: user.spec.displayName,
+            icon: {
+              component: markRaw(IconUserSettings),
+            },
+            group: t("core.components.global_search.groups.user"),
+            route: {
+              name: "UserDetail",
+              params: {
+                name: user.metadata.name,
+              },
+            },
+          });
+        });
+      });
+  }
+
+  if (utils.permission.has(["system:plugins:view"])) {
+    coreApiClient.plugin.plugin.listPlugin().then((response) => {
+      response.data.items.forEach((plugin) => {
         fuse.add({
-          title: user.spec.displayName,
+          title: plugin.spec.displayName as string,
           icon: {
-            component: markRaw(IconUserSettings),
+            src: plugin.status?.logo as string,
           },
-          group: t("core.components.global_search.groups.user"),
+          group: t("core.components.global_search.groups.plugin"),
           route: {
-            name: "UserDetail",
+            name: "PluginDetail",
             params: {
-              name: user.metadata.name,
+              name: plugin.metadata.name,
             },
           },
         });
@@ -98,51 +119,27 @@ const handleBuildSearchIndex = () => {
     });
   }
 
-  if (currentUserHasPermission(["system:plugins:view"])) {
-    apiClient.extension.plugin
-      .listPluginHaloRunV1alpha1Plugin()
-      .then((response) => {
-        response.data.items.forEach((plugin) => {
-          fuse.add({
-            title: plugin.spec.displayName as string,
-            icon: {
-              src: plugin.status?.logo as string,
+  if (utils.permission.has(["system:posts:view"])) {
+    coreApiClient.content.post.listPost().then((response) => {
+      response.data.items.forEach((post) => {
+        fuse.add({
+          title: post.spec.title,
+          icon: {
+            component: markRaw(IconBookRead),
+          },
+          group: t("core.components.global_search.groups.post"),
+          route: {
+            name: "PostEditor",
+            query: {
+              name: post.metadata.name,
             },
-            group: t("core.components.global_search.groups.plugin"),
-            route: {
-              name: "PluginDetail",
-              params: {
-                name: plugin.metadata.name,
-              },
-            },
-          });
+          },
         });
       });
-  }
+    });
 
-  if (currentUserHasPermission(["system:posts:view"])) {
-    apiClient.extension.post
-      .listContentHaloRunV1alpha1Post()
-      .then((response) => {
-        response.data.items.forEach((post) => {
-          fuse.add({
-            title: post.spec.title,
-            icon: {
-              component: markRaw(IconBookRead),
-            },
-            group: t("core.components.global_search.groups.post"),
-            route: {
-              name: "PostEditor",
-              query: {
-                name: post.metadata.name,
-              },
-            },
-          });
-        });
-      });
-
-    apiClient.extension.category
-      .listContentHaloRunV1alpha1Category({
+    coreApiClient.content.category
+      .listCategory({
         sort: ["metadata.creationTimestamp,desc"],
       })
       .then((response) => {
@@ -163,8 +160,8 @@ const handleBuildSearchIndex = () => {
         });
       });
 
-    apiClient.extension.tag
-      .listContentHaloRunV1alpha1Tag({
+    coreApiClient.content.tag
+      .listTag({
         sort: ["metadata.creationTimestamp,desc"],
       })
       .then((response) => {
@@ -186,77 +183,73 @@ const handleBuildSearchIndex = () => {
       });
   }
 
-  if (currentUserHasPermission(["system:singlepages:view"])) {
-    apiClient.extension.singlePage
-      .listContentHaloRunV1alpha1SinglePage()
-      .then((response) => {
-        response.data.items.forEach((singlePage) => {
-          fuse.add({
-            title: singlePage.spec.title,
-            icon: {
-              component: markRaw(IconPages),
+  if (utils.permission.has(["system:singlepages:view"])) {
+    coreApiClient.content.singlePage.listSinglePage().then((response) => {
+      response.data.items.forEach((singlePage) => {
+        fuse.add({
+          title: singlePage.spec.title,
+          icon: {
+            component: markRaw(IconPages),
+          },
+          group: t("core.components.global_search.groups.page"),
+          route: {
+            name: "SinglePageEditor",
+            query: {
+              name: singlePage.metadata.name,
             },
-            group: t("core.components.global_search.groups.page"),
-            route: {
-              name: "SinglePageEditor",
-              query: {
-                name: singlePage.metadata.name,
-              },
-            },
-          });
+          },
         });
       });
+    });
   }
 
-  if (currentUserHasPermission(["system:attachments:view"])) {
-    apiClient.extension.storage.attachment
-      .listStorageHaloRunV1alpha1Attachment()
-      .then((response) => {
-        response.data.items.forEach((attachment) => {
-          fuse.add({
-            title: attachment.spec.displayName as string,
-            icon: {
-              component: markRaw(IconFolder),
+  if (utils.permission.has(["system:attachments:view"])) {
+    coreApiClient.storage.attachment.listAttachment().then((response) => {
+      response.data.items.forEach((attachment) => {
+        fuse.add({
+          title: attachment.spec.displayName as string,
+          icon: {
+            component: markRaw(IconFolder),
+          },
+          group: t("core.components.global_search.groups.attachment"),
+          route: {
+            name: "Attachments",
+            query: {
+              name: attachment.metadata.name,
             },
-            group: t("core.components.global_search.groups.attachment"),
-            route: {
-              name: "Attachments",
-              query: {
-                name: attachment.metadata.name,
-              },
-            },
-          });
+          },
         });
       });
+    });
   }
 
   if (
-    currentUserHasPermission(["system:settings:view"]) &&
-    currentUserHasPermission(["system:configmaps:view"])
+    utils.permission.has(
+      ["system:settings:view", "system:configmaps:view"],
+      false
+    )
   ) {
-    apiClient.extension.setting
-      .getV1alpha1Setting({ name: "system" })
-      .then((response) => {
-        response.data.spec.forms.forEach((form) => {
-          fuse.add({
-            title: form.label as string,
-            icon: {
-              component: markRaw(IconSettings),
+    coreApiClient.setting.getSetting({ name: "system" }).then((response) => {
+      response.data.spec.forms.forEach((form) => {
+        fuse.add({
+          title: form.label as string,
+          icon: {
+            component: markRaw(IconSettings),
+          },
+          group: t("core.components.global_search.groups.setting"),
+          route: {
+            name: "SystemSetting",
+            params: {
+              group: form.group,
             },
-            group: t("core.components.global_search.groups.setting"),
-            route: {
-              name: "SystemSetting",
-              params: {
-                group: form.group,
-              },
-            },
-          });
+          },
         });
       });
+    });
   }
 
-  if (currentUserHasPermission(["system:themes:view"])) {
-    apiClient.theme
+  if (utils.permission.has(["system:themes:view"])) {
+    consoleApiClient.theme.theme
       .fetchThemeSetting({ name: "-" })
       .then(({ data: themeSettings }) => {
         themeSettings.spec.forms.forEach((form) => {
@@ -379,7 +372,7 @@ useEventListener("keydown", handleKeydown);
       </div>
       <ul
         v-if="searchResults.length > 0"
-        class="box-border flex h-full w-full flex-col gap-0.5"
+        class="box-border flex h-full w-full flex-col gap-1"
         role="list"
       >
         <li
@@ -388,33 +381,29 @@ useEventListener("keydown", handleKeydown);
           :key="itemIndex"
           @click="handleRoute(item)"
         >
-          <VEntity
-            class="rounded-md px-2 py-2.5 hover:bg-gray-100"
+          <div
+            class="flex cursor-pointer items-center rounded-md px-2 py-2.5 hover:bg-gray-100"
             :class="{ 'bg-gray-100': selectedIndex === itemIndex }"
           >
-            <template #start>
-              <VEntityField>
-                <template #description>
-                  <div class="h-5 w-5 rounded border p-0.5">
-                    <component
-                      :is="item.icon.component"
-                      v-if="'component' in item.icon"
-                      class="h-full w-full"
-                    />
-                    <img
-                      v-if="'src' in item.icon"
-                      :src="item.icon.src"
-                      class="h-full w-full object-cover"
-                    />
-                  </div>
-                </template>
-              </VEntityField>
-              <VEntityField :title="item.title"></VEntityField>
-            </template>
-            <template #end>
-              <VEntityField :description="item.group"></VEntityField>
-            </template>
-          </VEntity>
+            <div class="inline-flex flex-1 items-center gap-3">
+              <div class="h-5 w-5 rounded border p-0.5">
+                <component
+                  :is="item.icon.component"
+                  v-if="'component' in item.icon"
+                  class="h-full w-full"
+                />
+                <img
+                  v-if="'src' in item.icon"
+                  :src="item.icon.src"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+              <span class="text-sm font-medium">{{ item.title }}</span>
+            </div>
+            <div class="flex-none flex-shrink-0 text-xs text-gray-500">
+              {{ item.group }}
+            </div>
+          </div>
         </li>
       </ul>
     </div>

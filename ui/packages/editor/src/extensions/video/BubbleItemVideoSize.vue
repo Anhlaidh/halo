@@ -1,9 +1,9 @@
 <script lang="ts" setup>
 import { BlockActionInput } from "@/components";
-import type { Editor } from "@/tiptap/vue-3";
+import { i18n } from "@/locales";
+import type { Editor } from "@/tiptap";
 import { computed, type Component } from "vue";
 import Video from "./index";
-import { i18n } from "@/locales";
 const props = defineProps<{
   editor: Editor;
   isActive?: ({ editor }: { editor: Editor }) => boolean;
@@ -54,6 +54,6 @@ function handleSetSize(width: string, height: string) {
 </template>
 <style lang="scss">
 .editor-block__actions-input {
-  @apply bg-gray-50 rounded-md hover:bg-gray-100 block px-2 w-32 py-1 text-sm text-gray-900 border border-gray-300  focus:ring-blue-500 focus:border-blue-500;
+  @apply block w-32 rounded-md border border-gray-300 bg-gray-50 px-2 py-1 text-sm text-gray-900 hover:bg-gray-100 focus:border-blue-500 focus:ring-blue-500;
 }
 </style>

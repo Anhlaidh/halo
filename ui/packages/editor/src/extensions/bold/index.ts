@@ -1,13 +1,12 @@
-import type { Editor } from "@/tiptap/vue-3";
-import TiptapBold from "@tiptap/extension-bold";
-import type { BoldOptions } from "@tiptap/extension-bold";
 import ToolbarItem from "@/components/toolbar/ToolbarItem.vue";
-import MdiFormatBold from "~icons/mdi/format-bold";
-import { markRaw } from "vue";
 import { i18n } from "@/locales";
+import type { Editor } from "@/tiptap";
 import type { ExtensionOptions } from "@/types";
+import TiptapBold from "@tiptap/extension-bold";
+import { markRaw } from "vue";
+import MdiFormatBold from "~icons/mdi/format-bold";
 
-const Bold = TiptapBold.extend<ExtensionOptions & BoldOptions>({
+const Bold = TiptapBold.extend<ExtensionOptions>({
   addOptions() {
     return {
       ...this.parent?.(),

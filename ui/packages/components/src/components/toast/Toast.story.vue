@@ -2,9 +2,9 @@
 import { VButton } from "../button";
 import { VSpace } from "../space";
 import { Toast } from "./toast-manager";
-import type { Type } from "./interface";
+import type { ToastType } from "./types";
 
-function handleShowToast(type: Type, content: string) {
+function handleShowToast(type: ToastType, content: string) {
   Toast[type](content);
 }
 </script>

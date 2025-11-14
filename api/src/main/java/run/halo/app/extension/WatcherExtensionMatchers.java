@@ -26,11 +26,11 @@ public class WatcherExtensionMatchers {
         this.client = client;
         this.gvk = gvk;
         this.onAddMatcher =
-            Objects.requireNonNullElse(onAddMatcher, emptyMatcher(client, gvk));
+            Objects.requireNonNullElseGet(onAddMatcher, () -> emptyMatcher(client, gvk));
         this.onUpdateMatcher =
-            Objects.requireNonNullElse(onUpdateMatcher, emptyMatcher(client, gvk));
+            Objects.requireNonNullElseGet(onUpdateMatcher, () -> emptyMatcher(client, gvk));
         this.onDeleteMatcher =
-            Objects.requireNonNullElse(onDeleteMatcher, emptyMatcher(client, gvk));
+            Objects.requireNonNullElseGet(onDeleteMatcher, () -> emptyMatcher(client, gvk));
     }
 
     public GroupVersionKind getGroupVersionKind() {
@@ -38,15 +38,15 @@ public class WatcherExtensionMatchers {
     }
 
     public ExtensionMatcher onAddMatcher() {
-        return this.onAddMatcher;
+        return delegateExtensionMatcher(this.onAddMatcher);
     }
 
     public ExtensionMatcher onUpdateMatcher() {
-        return this.onUpdateMatcher;
+        return delegateExtensionMatcher(this.onUpdateMatcher);
     }
 
     public ExtensionMatcher onDeleteMatcher() {
-        return this.onDeleteMatcher;
+        return delegateExtensionMatcher(this.onDeleteMatcher);
     }
 
     public static WatcherExtensionMatchersBuilder builder(ExtensionClient client,
@@ -57,5 +57,9 @@ public class WatcherExtensionMatchers {
     static ExtensionMatcher emptyMatcher(ExtensionClient client,
         GroupVersionKind gvk) {
         return DefaultExtensionMatcher.builder(client, gvk).build();
+    }
+
+    ExtensionMatcher delegateExtensionMatcher(ExtensionMatcher matcher) {
+        return extension -> extension.groupVersionKind().equals(gvk) && matcher.match(extension);
     }
 }

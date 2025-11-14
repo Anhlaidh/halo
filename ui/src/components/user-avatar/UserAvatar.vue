@@ -1,25 +1,24 @@
 <script lang="ts" setup>
-import { apiClient } from "@/utils/api-client";
+import { rbacAnnotations } from "@/constants/annotations";
+import { consoleApiClient } from "@halo-dev/api-client";
 import {
-  IconRiPencilFill,
+  Dialog,
   IconAddCircle,
-  VButton,
+  IconRiPencilFill,
+  Toast,
   VAvatar,
+  VButton,
   VDropdown,
   VDropdownItem,
+  VLoading,
   VModal,
   VSpace,
-  Toast,
-  Dialog,
-  VLoading,
 } from "@halo-dev/components";
-import { ref, defineAsyncComponent, type Ref, toRefs } from "vue";
-import { usePermission } from "@/utils/permission";
+import { stores, utils } from "@halo-dev/ui-shared";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
-import { useI18n } from "vue-i18n";
 import { useFileDialog } from "@vueuse/core";
-import { computed } from "vue";
-import { rbacAnnotations } from "@/constants/annotations";
+import { computed, defineAsyncComponent, ref, toRefs, type Ref } from "vue";
+import { useI18n } from "vue-i18n";
 
 const props = withDefaults(
   defineProps<{
@@ -33,17 +32,17 @@ const props = withDefaults(
 );
 
 const { isCurrentUser, name } = toRefs(props);
+const { fetchCurrentUser } = stores.currentUser();
 
 const queryClient = useQueryClient();
-const { currentUserHasPermission } = usePermission();
 const { t } = useI18n();
 
 const { data: avatar, isFetching } = useQuery({
   queryKey: ["user-avatar", name, isCurrentUser],
   queryFn: async () => {
     const { data } = props.isCurrentUser
-      ? await apiClient.user.getCurrentUserDetail()
-      : await apiClient.user.getUserDetail({
+      ? await consoleApiClient.user.getCurrentUserDetail()
+      : await consoleApiClient.user.getUserDetail({
           name: props.name,
         });
 
@@ -96,7 +95,7 @@ const handleUploadAvatar = () => {
   userAvatarCropper.value?.getCropperFile().then((file) => {
     uploadSaving.value = true;
 
-    apiClient.user
+    consoleApiClient.user
       .uploadUserAvatar({
         name: props.isCurrentUser ? "-" : props.name,
         file: file,
@@ -104,6 +103,9 @@ const handleUploadAvatar = () => {
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["user-avatar"] });
         queryClient.invalidateQueries({ queryKey: ["user-detail"] });
+        if (props.isCurrentUser) {
+          fetchCurrentUser();
+        }
         handleCloseCropperModal();
       })
       .catch(() => {
@@ -123,13 +125,16 @@ const handleRemoveCurrentAvatar = () => {
     confirmText: t("core.common.buttons.confirm"),
     cancelText: t("core.common.buttons.cancel"),
     onConfirm: async () => {
-      apiClient.user
+      consoleApiClient.user
         .deleteUserAvatar({
           name: props.isCurrentUser ? "-" : props.name,
         })
         .then(() => {
           queryClient.invalidateQueries({ queryKey: ["user-avatar"] });
           queryClient.invalidateQueries({ queryKey: ["user-detail"] });
+          if (props.isCurrentUser) {
+            fetchCurrentUser();
+          }
         })
         .catch(() => {
           Toast.error(t("core.components.user_avatar.toast_remove_failed"));
@@ -162,10 +167,10 @@ const hasAvatar = computed(() => {
       circle
       width="100%"
       height="100%"
-      class="ring-4 ring-white drop-shadow-md"
+      class="shadow-xl ring-4 ring-white"
     />
     <VDropdown
-      v-if="currentUserHasPermission(['system:users:manage']) || isCurrentUser"
+      v-if="utils.permission.has(['system:users:manage']) || isCurrentUser"
     >
       <div
         class="absolute left-0 right-0 top-0 hidden h-full w-full cursor-pointer items-center rounded-full border-0 bg-black/60 text-center transition-all duration-300 group-hover:flex"

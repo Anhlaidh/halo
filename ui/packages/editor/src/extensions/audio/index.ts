@@ -1,29 +1,30 @@
-import type { ExtensionOptions, NodeBubbleMenu } from "@/types";
-import {
-  Editor,
-  isActive,
-  mergeAttributes,
-  Node,
-  nodeInputRule,
-  type Range,
-  VueNodeViewRenderer,
-} from "@/tiptap/vue-3";
-import type { EditorState } from "@/tiptap/pm";
-import { markRaw } from "vue";
-import AudioView from "./AudioView.vue";
-import MdiMusicCircleOutline from "~icons/mdi/music-circle-outline";
+import { BlockActionSeparator } from "@/components";
+import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
 import ToolboxItemVue from "@/components/toolbox/ToolboxItem.vue";
 import { i18n } from "@/locales";
+import {
+  Editor,
+  Node,
+  PluginKey,
+  VueNodeViewRenderer,
+  isActive,
+  mergeAttributes,
+  nodeInputRule,
+  type Range,
+} from "@/tiptap";
+import type { EditorState } from "@/tiptap/pm";
+import type { ExtensionOptions, NodeBubbleMenuType } from "@/types";
+import { deleteNode } from "@/utils";
+import { markRaw } from "vue";
+import MdiLinkVariant from "~icons/mdi/link-variant";
+import MdiMotionPlay from "~icons/mdi/motion-play";
+import MdiMotionPlayOutline from "~icons/mdi/motion-play-outline";
+import MdiMusicCircleOutline from "~icons/mdi/music-circle-outline";
 import MdiPlayCircle from "~icons/mdi/play-circle";
 import MdiPlayCircleOutline from "~icons/mdi/play-circle-outline";
-import MdiMotionPlayOutline from "~icons/mdi/motion-play-outline";
-import MdiMotionPlay from "~icons/mdi/motion-play";
-import { BlockActionSeparator } from "@/components";
-import BubbleItemAudioLink from "./BubbleItemAudioLink.vue";
-import MdiLinkVariant from "~icons/mdi/link-variant";
 import MdiShare from "~icons/mdi/share";
-import { deleteNode } from "@/utils";
-import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
+import AudioView from "./AudioView.vue";
+import BubbleItemAudioLink from "./BubbleItemAudioLink.vue";
 
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
@@ -33,8 +34,11 @@ declare module "@/tiptap" {
   }
 }
 
+export const AUDIO_BUBBLE_MENU_KEY = new PluginKey("audioBubbleMenu");
+
 const Audio = Node.create<ExtensionOptions>({
   name: "audio",
+  fakeSelection: true,
 
   inline() {
     return true;
@@ -154,7 +158,7 @@ const Audio = Node.create<ExtensionOptions>({
       },
       getToolboxItems({ editor }: { editor: Editor }) {
         return {
-          priority: 20,
+          priority: 30,
           component: markRaw(ToolboxItemVue),
           props: {
             editor,
@@ -170,9 +174,9 @@ const Audio = Node.create<ExtensionOptions>({
           },
         };
       },
-      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenu {
+      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenuType {
         return {
-          pluginKey: "audioBubbleMenu",
+          pluginKey: AUDIO_BUBBLE_MENU_KEY,
           shouldShow: ({ state }: { state: EditorState }) => {
             return isActive(state, Audio.name);
           },
@@ -270,22 +274,6 @@ const Audio = Node.create<ExtensionOptions>({
               },
             },
           ],
-        };
-      },
-      getDraggable() {
-        return {
-          getRenderContainer({ dom }) {
-            let container = dom;
-            while (
-              container &&
-              !container.hasAttribute("data-node-view-wrapper")
-            ) {
-              container = container.parentElement as HTMLElement;
-            }
-            return {
-              el: container,
-            };
-          },
         };
       },
     };

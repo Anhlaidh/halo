@@ -1,22 +1,20 @@
 <script lang="ts" setup>
-import { apiClient } from "@/utils/api-client";
+import PostTag from "@console/modules/contents/posts/tags/components/PostTag.vue";
+import { usePostTag } from "@console/modules/contents/posts/tags/composables/use-post-tag";
 import type { FormKitFrameworkContext } from "@formkit/core";
 import type { Tag } from "@halo-dev/api-client";
-import { computed, ref, watch, type PropType } from "vue";
-import PostTag from "@console/modules/contents/posts/tags/components/PostTag.vue";
+import { coreApiClient } from "@halo-dev/api-client";
 import {
-  IconCheckboxCircle,
   IconArrowRight,
+  IconCheckboxCircle,
   IconClose,
 } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
 import { onClickOutside } from "@vueuse/core";
 import Fuse from "fuse.js";
-import { usePermission } from "@/utils/permission";
+import ShortUniqueId from "short-unique-id";
 import { slugify } from "transliteration";
-import { usePostTag } from "@console/modules/contents/posts/tags/composables/use-post-tag";
-import HasPermission from "@/components/permission/HasPermission.vue";
-
-const { currentUserHasPermission } = usePermission();
+import { computed, ref, watch, type PropType } from "vue";
 
 const props = defineProps({
   context: {
@@ -191,28 +189,40 @@ const scrollToSelected = () => {
   }
 };
 
+const uid = new ShortUniqueId();
+
 const handleCreateTag = async () => {
-  if (!currentUserHasPermission(["system:posts:manage"])) {
+  if (!utils.permission.has(["system:posts:manage"])) {
     return;
   }
 
-  const { data } =
-    await apiClient.extension.tag.createContentHaloRunV1alpha1Tag({
-      tag: {
-        spec: {
-          displayName: text.value,
-          slug: slugify(text.value, { trim: true }),
-          color: "#ffffff",
-          cover: "",
-        },
-        apiVersion: "content.halo.run/v1alpha1",
-        kind: "Tag",
-        metadata: {
-          name: "",
-          generateName: "tag-",
-        },
+  let slug = slugify(text.value, { trim: true });
+
+  // Check if slug is unique, if not, add -1 to the slug
+  const { data: tagsWithSameSlug } = await coreApiClient.content.tag.listTag({
+    fieldSelector: [`spec.slug=${slug}`],
+  });
+
+  if (tagsWithSameSlug.total) {
+    slug = `${slug}-${uid.randomUUID(8)}`;
+  }
+
+  const { data } = await coreApiClient.content.tag.createTag({
+    tag: {
+      spec: {
+        displayName: text.value,
+        slug,
+        color: "#ffffff",
+        cover: "",
       },
-    });
+      apiVersion: "content.halo.run/v1alpha1",
+      kind: "Tag",
+      metadata: {
+        name: "",
+        generateName: "tag-",
+      },
+    },
+  });
 
   handleFetchTags();
 

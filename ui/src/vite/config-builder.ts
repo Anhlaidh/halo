@@ -1,14 +1,12 @@
-import { fileURLToPath } from "url";
-import fs from "fs";
-import { defineConfig, type Plugin } from "vite";
 import Vue from "@vitejs/plugin-vue";
 import VueJsx from "@vitejs/plugin-vue-jsx";
-import { VitePWA } from "vite-plugin-pwa";
-import Icons from "unplugin-icons/vite";
-import { setupLibraryExternal } from "./library-external";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import GzipPlugin from "rollup-plugin-gzip";
-import path from "path";
-import VueDevTools from "vite-plugin-vue-devtools";
+import Icons from "unplugin-icons/vite";
+import { defineConfig, type Plugin } from "vite";
+import { setupLibraryExternal } from "./library-external";
 
 interface Options {
   base: string;
@@ -35,16 +33,6 @@ export const sharedPlugins = [
       },
     },
   }),
-  VitePWA({
-    manifest: {
-      name: "Halo",
-      short_name: "Halo",
-      description: "Web Client For Halo",
-      theme_color: "#fff",
-    },
-    disable: true,
-  }),
-  VueDevTools(),
 ];
 
 export function createViteConfig(options: Options) {
@@ -57,6 +45,9 @@ export function createViteConfig(options: Options) {
 
   return defineConfig({
     base,
+    experimental: {
+      enableNativePlugin: true,
+    },
     plugins: [
       ...sharedPlugins,
       ...setupLibraryExternal(isProduction, base, entryFile),
@@ -81,20 +72,22 @@ export function createViteConfig(options: Options) {
       chunkSizeWarningLimit: 2048,
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: [
-              "lodash-es",
-              "axios",
+          advancedChunks: {
+            groups: [
+              "es-toolkit",
               "vue-grid-layout",
               "transliteration",
               "vue-draggable-plus",
-              "emoji-mart",
               "colorjs.io",
-              "jsencrypt",
               "overlayscrollbars",
               "overlayscrollbars-vue",
               "floating-vue",
-            ],
+              "@he-tree/vue",
+              "pretty-bytes",
+            ].map((name) => ({
+              name: "vendor",
+              test: name,
+            })),
           },
         },
       },

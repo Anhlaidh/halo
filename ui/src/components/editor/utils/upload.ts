@@ -1,18 +1,17 @@
 // image drag and paste upload
-import { CoreEditor } from "@halo-dev/richtext-editor";
-import type { Attachment } from "@halo-dev/api-client";
+import { ucApiClient, type Attachment } from "@halo-dev/api-client";
+import { Editor, PMNode } from "@halo-dev/richtext-editor";
+import { utils } from "@halo-dev/ui-shared";
+import type { AxiosRequestConfig } from "axios";
+import { chunk } from "es-toolkit";
+import ExtensionAudio from "../extensions/audio";
 import Image from "../extensions/image";
 import ExtensionVideo from "../extensions/video";
-import ExtensionAudio from "../extensions/audio";
-import type { AxiosRequestConfig } from "axios";
-import { usePermission } from "@/utils/permission";
 
 export interface FileProps {
   file: File;
-  editor: CoreEditor;
+  editor: Editor;
 }
-
-const { currentUserHasPermission } = usePermission();
 
 /**
  * Handles file events, determining if the file is an image and triggering the appropriate upload process.
@@ -25,7 +24,7 @@ export const handleFileEvent = ({ file, editor }: FileProps) => {
     return false;
   }
 
-  if (!currentUserHasPermission(["uc:attachments:manage"])) {
+  if (!utils.permission.has(["uc:attachments:manage"])) {
     return false;
   }
 
@@ -141,4 +140,71 @@ export function fileToBase64(file: File): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
+}
+
+export function containsFileClipboardIdentifier(types: readonly string[]) {
+  const fileTypes = ["files", "application/x-moz-file", "public.file-url"];
+  return types.some((type) => fileTypes.includes(type.toLowerCase()));
+}
+
+export async function batchUploadExternalLink(
+  editor: Editor,
+  nodes: { node: PMNode; pos: number; index: number; parent: PMNode | null }[]
+) {
+  const chunks = chunk(nodes, 5);
+
+  for (const chunkNodes of chunks) {
+    await Promise.all(
+      chunkNodes.map((node) => uploadExternalLink(editor, node))
+    );
+  }
+}
+
+export async function uploadExternalLink(
+  editor: Editor,
+  nodeWithPos: {
+    node: PMNode;
+    pos: number;
+    index: number;
+    parent: PMNode | null;
+  }
+) {
+  const { node, pos } = nodeWithPos;
+  const { src } = node.attrs;
+
+  if (!isExternalAsset(src)) {
+    return;
+  }
+
+  try {
+    const { data } =
+      await ucApiClient.storage.attachment.externalTransferAttachment1({
+        ucUploadFromUrlRequest: {
+          url: src,
+        },
+        waitForPermalink: true,
+      });
+
+    const url = data.status?.permalink;
+    const name = data.spec.displayName;
+    const tr = editor.view.state.tr;
+    tr.setNodeMarkup(pos, node.type, {
+      ...node.attrs,
+      src: url,
+      name,
+    });
+    editor.view.dispatch(tr);
+  } catch (error) {
+    console.error("Failed to upload external link:", error);
+  }
+}
+
+export function isExternalAsset(src: string) {
+  if (src?.startsWith("/")) {
+    return false;
+  }
+
+  const currentOrigin = window.location.origin;
+
+  return !src?.startsWith(currentOrigin);
 }

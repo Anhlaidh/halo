@@ -11,7 +11,6 @@ export enum rbacAnnotations {
   DEPENDENCIES = "rbac.authorization.halo.run/dependencies",
   AVATAR_ATTACHMENT_NAME = "halo.run/avatar-attachment-name",
   LAST_AVATAR_ATTACHMENT_NAME = "halo.run/last-avatar-attachment-name",
-  REDIRECT_ON_LOGIN = "rbac.authorization.halo.run/redirect-on-login",
   DISALLOW_ACCESS_CONSOLE = "rbac.authorization.halo.run/disallow-access-console",
 }
 
@@ -28,4 +27,9 @@ export enum contentAnnotations {
 // pat
 export enum patAnnotations {
   ACCESS_TOKEN = "security.halo.run/access-token",
+}
+
+// Secret
+export enum secretAnnotations {
+  DESCRIPTION = "secret.halo.run/description",
 }

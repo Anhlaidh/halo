@@ -1,14 +1,15 @@
 <script lang="ts" setup>
-import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
-import { ref } from "vue";
-import PostSettingForm from "./PostSettingForm.vue";
-import type { Content, Post } from "@halo-dev/api-client";
-import type { PostFormState } from "../types";
-import { useMutation } from "@tanstack/vue-query";
-import { useI18n } from "vue-i18n";
-import { randomUUID } from "@/utils/id";
 import { contentAnnotations } from "@/constants/annotations";
-import { apiClient } from "@/utils/api-client";
+import type { Content, Post } from "@halo-dev/api-client";
+import { ucApiClient } from "@halo-dev/api-client";
+import { Toast, VButton, VModal, VSpace } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
+import { useMutation } from "@tanstack/vue-query";
+import { ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { usePostPublishMutate } from "../composables/use-post-publish-mutate";
+import type { PostFormState } from "../types";
+import PostSettingForm from "./PostSettingForm.vue";
 
 const { t } = useI18n();
 
@@ -31,6 +32,8 @@ const emit = defineEmits<{
 
 const modal = ref<InstanceType<typeof VModal> | null>(null);
 
+const { mutateAsync: postPublishMutate } = usePostPublishMutate();
+
 const { mutate, isLoading } = useMutation({
   mutationKey: ["uc:create-post"],
   mutationFn: async ({ data }: { data: PostFormState }) => {
@@ -41,7 +44,7 @@ const { mutate, isLoading } = useMutation({
         annotations: {
           [contentAnnotations.CONTENT_JSON]: JSON.stringify(props.content),
         },
-        name: randomUUID(),
+        name: utils.id.uuid(),
       },
       spec: {
         allowComment: data.allowComment,
@@ -55,7 +58,7 @@ const { mutate, isLoading } = useMutation({
         htmlMetas: [],
         pinned: data.pinned,
         priority: 0,
-        publish: false,
+        publish: props.publish,
         publishTime: data.publishTime,
         slug: data.slug,
         tags: data.tags,
@@ -64,14 +67,12 @@ const { mutate, isLoading } = useMutation({
       },
     };
 
-    const { data: createdPost } = await apiClient.uc.post.createMyPost({
+    const { data: createdPost } = await ucApiClient.content.post.createMyPost({
       post,
     });
 
     if (props.publish) {
-      await apiClient.uc.post.publishMyPost({
-        name: post.metadata.name,
-      });
+      await postPublishMutate({ name: post.metadata.name });
     }
 
     return createdPost;

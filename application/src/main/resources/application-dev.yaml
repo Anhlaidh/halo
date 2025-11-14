@@ -15,6 +15,9 @@ spring:
         use-last-modified: false
 
 halo:
+  security:
+    basic-auth:
+      disabled: false
   console:
     proxy:
       endpoint: http://localhost:3000/
@@ -29,6 +32,7 @@ halo:
 logging:
   level:
     run.halo.app: DEBUG
+    web: DEBUG
     org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler: DEBUG
 springdoc:
   cache:

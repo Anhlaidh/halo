@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import { VButton, VModal, VSpace } from "@halo-dev/components";
 import SubmitButton from "@/components/button/SubmitButton.vue";
-import { onMounted, ref } from "vue";
-import type { User } from "@halo-dev/api-client";
-import { apiClient } from "@/utils/api-client";
-import { cloneDeep } from "lodash-es";
+import { PASSWORD_REGEX } from "@/constants/regex";
 import { setFocus } from "@/formkit/utils/focus";
+import type { User } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
+import { VButton, VModal, VSpace } from "@halo-dev/components";
+import { cloneDeep } from "es-toolkit";
+import { onMounted, ref } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -45,7 +46,7 @@ const handleChangePassword = async () => {
     const changePasswordRequest = cloneDeep(formState.value);
     delete changePasswordRequest.password_confirm;
 
-    await apiClient.user.changeAnyonePassword({
+    await consoleApiClient.user.changeAnyonePassword({
       name: props.user?.metadata.name || "",
       changePasswordRequest,
     });
@@ -66,6 +67,7 @@ const handleChangePassword = async () => {
     :title="$t('core.user.change_password_modal.title')"
     @close="emit('close')"
   >
+    <!-- @vue-ignore -->
     <FormKit
       id="password-form"
       v-model="formState"
@@ -80,9 +82,13 @@ const handleChangePassword = async () => {
         :label="$t('core.user.change_password_modal.fields.new_password.label')"
         name="password"
         type="password"
-        validation="required:trim|length:5,100|matches:/^\S.*\S$/"
+        :validation="[
+          ['required'],
+          ['length', 5, 257],
+          ['matches', PASSWORD_REGEX],
+        ]"
         :validation-messages="{
-          matches: $t('core.formkit.validation.trim'),
+          matches: $t('core.formkit.validation.password'),
         }"
       ></FormKit>
       <FormKit
@@ -91,10 +97,7 @@ const handleChangePassword = async () => {
         "
         name="password_confirm"
         type="password"
-        validation="confirm|required:trim|length:5,100|matches:/^\S.*\S$/"
-        :validation-messages="{
-          matches: $t('core.formkit.validation.trim'),
-        }"
+        validation="confirm|required"
       ></FormKit>
     </FormKit>
     <template #footer>

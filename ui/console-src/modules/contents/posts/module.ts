@@ -1,22 +1,12 @@
-import { definePlugin } from "@halo-dev/console-shared";
 import BasicLayout from "@console/layouts/BasicLayout.vue";
 import BlankLayout from "@console/layouts/BlankLayout.vue";
 import { IconBookRead } from "@halo-dev/components";
-import PostList from "./PostList.vue";
-import DeletedPostList from "./DeletedPostList.vue";
-import PostEditor from "./PostEditor.vue";
-import CategoryList from "./categories/CategoryList.vue";
-import TagList from "./tags/TagList.vue";
-import PostStatsWidget from "./widgets/PostStatsWidget.vue";
-import RecentPublishedWidget from "./widgets/RecentPublishedWidget.vue";
+import { definePlugin } from "@halo-dev/ui-shared";
 import { markRaw } from "vue";
-import PostSnapshots from "./PostSnapshots.vue";
+import PostEditor from "./PostEditor.vue";
+import PostList from "./PostList.vue";
 
 export default definePlugin({
-  components: {
-    PostStatsWidget,
-    RecentPublishedWidget,
-  },
   routes: [
     {
       path: "/posts",
@@ -43,7 +33,7 @@ export default definePlugin({
         {
           path: "deleted",
           name: "DeletedPosts",
-          component: DeletedPostList,
+          component: () => import("./DeletedPostList.vue"),
           meta: {
             title: "core.deleted_post.title",
             searchable: true,
@@ -64,7 +54,7 @@ export default definePlugin({
         {
           path: "snapshots",
           name: "PostSnapshots",
-          component: PostSnapshots,
+          component: () => import("./PostSnapshots.vue"),
           meta: {
             title: "core.post_snapshots.title",
             searchable: false,
@@ -79,7 +69,7 @@ export default definePlugin({
             {
               path: "",
               name: "Categories",
-              component: CategoryList,
+              component: () => import("./categories/CategoryList.vue"),
               meta: {
                 title: "core.post_category.title",
                 searchable: true,
@@ -95,7 +85,7 @@ export default definePlugin({
             {
               path: "",
               name: "Tags",
-              component: TagList,
+              component: () => import("./tags/TagList.vue"),
               meta: {
                 title: "core.post_tag.title",
                 searchable: true,

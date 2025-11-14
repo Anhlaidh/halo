@@ -2,6 +2,7 @@ package run.halo.app;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,4 +35,12 @@ public class PathPrefixPredicateTest {
 
     }
 
+
+    @Test
+    void urlTest() {
+        URI uri = URI.create("https:///path");
+        System.out.println(uri);
+        System.out.println(uri.getPath());
+        System.out.println(URI.create("/"));
+    }
 }

@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import UserFilterDropdown from "@/components/filter/UserFilterDropdown.vue";
 import LazyImage from "@/components/image/LazyImage.vue";
-import { apiClient } from "@/utils/api-client";
+import LazyVideo from "@/components/video/LazyVideo.vue";
 import { isImage } from "@/utils/image";
 import type { Attachment, Group } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -20,6 +21,7 @@ import {
   VDropdown,
   VDropdownItem,
   VEmpty,
+  VEntityContainer,
   VLoading,
   VPageHeader,
   VPagination,
@@ -27,13 +29,14 @@ import {
 } from "@halo-dev/components";
 import { useLocalStorage } from "@vueuse/core";
 import { useRouteQuery } from "@vueuse/router";
-import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { computed, onMounted, provide, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import AttachmentDetailModal from "./components/AttachmentDetailModal.vue";
+import AttachmentError from "./components/AttachmentError.vue";
 import AttachmentGroupList from "./components/AttachmentGroupList.vue";
 import AttachmentListItem from "./components/AttachmentListItem.vue";
+import AttachmentLoading from "./components/AttachmentLoading.vue";
 import AttachmentPoliciesModal from "./components/AttachmentPoliciesModal.vue";
 import AttachmentUploadModal from "./components/AttachmentUploadModal.vue";
 import { useAttachmentControl } from "./composables/use-attachment";
@@ -96,7 +99,7 @@ function handleClearFilters() {
 const {
   attachments,
   selectedAttachment,
-  selectedAttachments,
+  selectedAttachmentNames,
   checkedAll,
   isLoading,
   isFetching,
@@ -125,23 +128,25 @@ const {
   size: size,
 });
 
-provide<Ref<Set<Attachment>>>("selectedAttachments", selectedAttachments);
+provide<Ref<Set<string>>>("selectedAttachmentNames", selectedAttachmentNames);
 
 const handleMove = async (group: Group) => {
   try {
-    const promises = Array.from(selectedAttachments.value).map((attachment) => {
-      const attachmentToUpdate = cloneDeep(attachment);
-      attachmentToUpdate.spec.groupName = group.metadata.name;
-      return apiClient.extension.storage.attachment.updateStorageHaloRunV1alpha1Attachment(
-        {
-          name: attachment.metadata.name,
-          attachment: attachmentToUpdate,
-        }
-      );
+    const promises = Array.from(selectedAttachmentNames.value).map((name) => {
+      return coreApiClient.storage.attachment.patchAttachment({
+        name,
+        jsonPatchInner: [
+          {
+            op: "add",
+            path: "/spec/groupName",
+            value: group.metadata.name,
+          },
+        ],
+      });
     });
 
     await Promise.all(promises);
-    selectedAttachments.value.clear();
+    selectedAttachmentNames.value.clear();
 
     Toast.success(t("core.attachment.operations.move.toast_success"));
   } catch (e) {
@@ -156,13 +161,13 @@ const handleClickItem = (attachment: Attachment) => {
     return;
   }
 
-  if (selectedAttachments.value.size > 0) {
+  if (selectedAttachmentNames.value.size > 0) {
     handleSelect(attachment);
     return;
   }
 
   selectedAttachment.value = attachment;
-  selectedAttachments.value.clear();
+  selectedAttachmentNames.value.clear();
   detailVisible.value = true;
 };
 
@@ -174,7 +179,6 @@ const handleCheckAllChange = (e: Event) => {
 const onDetailModalClose = () => {
   selectedAttachment.value = undefined;
   nameQuery.value = undefined;
-  nameQueryAttachment.value = undefined;
   detailVisible.value = false;
   handleFetchAttachments();
 };
@@ -205,16 +209,15 @@ const viewType = useLocalStorage("attachment-view-type", "list");
 const routeQueryAction = useRouteQuery<string | undefined>("action");
 
 onMounted(() => {
-  if (!routeQueryAction.value) {
-    return;
-  }
   if (routeQueryAction.value === "upload") {
     uploadVisible.value = true;
+  }
+  if (nameQuery.value) {
+    detailVisible.value = true;
   }
 });
 
 const nameQuery = useRouteQuery<string | undefined>("name");
-const nameQueryAttachment = ref<Attachment>();
 
 watch(
   () => selectedAttachment.value,
@@ -224,25 +227,11 @@ watch(
     }
   }
 );
-
-onMounted(() => {
-  if (!nameQuery.value) {
-    return;
-  }
-  apiClient.extension.storage.attachment
-    .getStorageHaloRunV1alpha1Attachment({
-      name: nameQuery.value,
-    })
-    .then((response) => {
-      nameQueryAttachment.value = response.data;
-      detailVisible.value = true;
-    });
-});
 </script>
 <template>
   <AttachmentDetailModal
     v-if="detailVisible"
-    :attachment="selectedAttachment || nameQueryAttachment"
+    :name="selectedAttachment?.metadata.name || nameQuery"
     @close="onDetailModalClose"
   >
     <template #actions>
@@ -254,38 +243,43 @@ onMounted(() => {
       </span>
     </template>
   </AttachmentDetailModal>
-  <AttachmentUploadModal v-if="uploadVisible" @close="onUploadModalClose" />
+  <AttachmentUploadModal
+    v-if="uploadVisible"
+    :initial-group-name="
+      selectedGroup === 'ungrouped' ? undefined : selectedGroup
+    "
+    :initial-policy-name="selectedPolicy"
+    @close="onUploadModalClose"
+  />
   <AttachmentPoliciesModal
     v-if="policyVisible"
     @close="policyVisible = false"
   />
   <VPageHeader :title="$t('core.attachment.title')">
     <template #icon>
-      <IconFolder class="mr-2 self-center" />
+      <IconFolder />
     </template>
     <template #actions>
-      <VSpace>
-        <VButton
-          v-permission="['system:attachments:manage']"
-          size="sm"
-          @click="policyVisible = true"
-        >
-          <template #icon>
-            <IconDatabase2Line class="h-full w-full" />
-          </template>
-          {{ $t("core.attachment.actions.storage_policies") }}
-        </VButton>
-        <VButton
-          v-permission="['system:attachments:manage']"
-          type="secondary"
-          @click="uploadVisible = true"
-        >
-          <template #icon>
-            <IconUpload class="h-full w-full" />
-          </template>
-          {{ $t("core.common.buttons.upload") }}
-        </VButton>
-      </VSpace>
+      <VButton
+        v-permission="['system:attachments:manage']"
+        size="sm"
+        @click="policyVisible = true"
+      >
+        <template #icon>
+          <IconDatabase2Line />
+        </template>
+        {{ $t("core.attachment.actions.storage_policies") }}
+      </VButton>
+      <VButton
+        v-permission="['system:attachments:manage']"
+        type="secondary"
+        @click="uploadVisible = true"
+      >
+        <template #icon>
+          <IconUpload />
+        </template>
+        {{ $t("core.common.buttons.upload") }}
+      </VButton>
     </template>
   </VPageHeader>
 
@@ -310,19 +304,19 @@ onMounted(() => {
                 </div>
                 <div class="flex w-full flex-1 items-center sm:w-auto">
                   <SearchInput
-                    v-if="!selectedAttachments.size"
+                    v-if="!selectedAttachmentNames.size"
                     v-model="keyword"
                   />
                   <VSpace v-else>
                     <VButton type="danger" @click="handleDeleteInBatch">
                       {{ $t("core.common.buttons.delete") }}
                     </VButton>
-                    <VButton @click="selectedAttachments.clear()">
+                    <VButton @click="selectedAttachmentNames.clear()">
                       {{
                         $t("core.attachment.operations.deselect_items.button")
                       }}
                     </VButton>
-                    <VDropdown>
+                    <VDropdown v-if="groups?.length">
                       <VButton>
                         {{ $t("core.attachment.operations.move.button") }}
                       </VButton>
@@ -486,7 +480,7 @@ onMounted(() => {
                     @click="uploadVisible = true"
                   >
                     <template #icon>
-                      <IconUpload class="h-full w-full" />
+                      <IconUpload />
                     </template>
                     {{ $t("core.attachment.empty.actions.upload") }}
                   </VButton>
@@ -521,28 +515,33 @@ onMounted(() => {
                         v-if="isImage(attachment.spec.mediaType)"
                         :key="attachment.metadata.name"
                         :alt="attachment.spec.displayName"
-                        :src="attachment.status?.permalink"
+                        :src="
+                          attachment.status?.thumbnails?.S ||
+                          attachment.status?.permalink
+                        "
                         classes="pointer-events-none object-cover group-hover:opacity-75 transform-gpu"
                       >
                         <template #loading>
-                          <div
-                            class="flex h-full items-center justify-center object-cover"
-                          >
-                            <span class="text-xs text-gray-400">
-                              {{ $t("core.common.status.loading") }}...
-                            </span>
-                          </div>
+                          <AttachmentLoading />
                         </template>
                         <template #error>
-                          <div
-                            class="flex h-full items-center justify-center object-cover"
-                          >
-                            <span class="text-xs text-red-400">
-                              {{ $t("core.common.status.loading_error") }}
-                            </span>
-                          </div>
+                          <AttachmentError />
                         </template>
                       </LazyImage>
+                      <LazyVideo
+                        v-else-if="
+                          attachment?.spec.mediaType?.startsWith('video/')
+                        "
+                        :src="attachment.status?.permalink"
+                        classes="object-cover group-hover:opacity-75"
+                      >
+                        <template #loading>
+                          <AttachmentLoading />
+                        </template>
+                        <template #error>
+                          <AttachmentError />
+                        </template>
+                      </LazyVideo>
                       <AttachmentFileTypeIcon
                         v-else
                         :file-name="attachment.spec.displayName"
@@ -566,12 +565,18 @@ onMounted(() => {
                     <div
                       v-if="!attachment.metadata.deletionTimestamp"
                       v-permission="['system:attachments:manage']"
-                      :class="{ '!flex': selectedAttachments.has(attachment) }"
+                      :class="{
+                        '!flex': selectedAttachmentNames.has(
+                          attachment.metadata.name
+                        ),
+                      }"
                       class="absolute left-0 top-0 hidden h-1/3 w-full cursor-pointer justify-end bg-gradient-to-b from-gray-300 to-transparent ease-in-out group-hover:flex"
                     >
                       <IconCheckboxFill
                         :class="{
-                          '!text-primary': selectedAttachments.has(attachment),
+                          '!text-primary': selectedAttachmentNames.has(
+                            attachment.metadata.name
+                          ),
                         }"
                         class="mr-1 mt-1 h-6 w-6 cursor-pointer text-white transition-all hover:text-primary"
                         @click.stop="handleSelect(attachment)"
@@ -582,22 +587,16 @@ onMounted(() => {
               </div>
             </Transition>
             <Transition v-if="viewType === 'list'" appear name="fade">
-              <ul
-                class="box-border h-full w-full divide-y divide-gray-100"
-                role="list"
-              >
-                <li
+              <VEntityContainer>
+                <AttachmentListItem
                   v-for="attachment in attachments"
                   :key="attachment.metadata.name"
-                >
-                  <AttachmentListItem
-                    :attachment="attachment"
-                    :is-selected="isChecked(attachment)"
-                    @select="handleSelect"
-                    @open-detail="handleClickItem"
-                  />
-                </li>
-              </ul>
+                  :attachment="attachment"
+                  :is-selected="isChecked(attachment)"
+                  @select="handleSelect"
+                  @open-detail="handleClickItem"
+                />
+              </VEntityContainer>
             </Transition>
           </div>
 

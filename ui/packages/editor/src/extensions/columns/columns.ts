@@ -1,23 +1,30 @@
+import { BlockActionSeparator, ToolboxItem } from "@/components";
+import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
+import { i18n } from "@/locales";
 import {
   Editor,
   findParentNode,
   isActive,
   mergeAttributes,
   Node,
+  posToDOMRect,
   type Range,
-} from "@/tiptap/vue-3";
-import { Node as PMNode, EditorState, TextSelection } from "@/tiptap/pm";
+} from "@/tiptap";
 import type { NodeType, Schema } from "@/tiptap/pm";
+import {
+  EditorState,
+  PluginKey,
+  Node as PMNode,
+  TextSelection,
+} from "@/tiptap/pm";
+import type { ExtensionOptions } from "@/types";
+import { deleteNode } from "@/utils";
 import { markRaw } from "vue";
-import Column from "./column";
+import MdiCollage from "~icons/mdi/collage";
+import RiDeleteColumn from "~icons/ri/delete-column";
 import RiInsertColumnLeft from "~icons/ri/insert-column-left";
 import RiInsertColumnRight from "~icons/ri/insert-column-right";
-import RiDeleteColumn from "~icons/ri/delete-column";
-import { BlockActionSeparator, ToolboxItem } from "@/components";
-import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
-import { i18n } from "@/locales";
-import { deleteNode } from "@/utils";
-import MdiCollage from "~icons/mdi/collage";
+import Column from "./column";
 
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
@@ -29,6 +36,8 @@ declare module "@/tiptap" {
     };
   }
 }
+
+export const COLUMNS_BUBBLE_MENU_KEY = new PluginKey("columnsBubbleMenu");
 
 const createColumns = (schema: Schema, colsCount: number) => {
   const types = getColumnsNodeTypes(schema);
@@ -66,6 +75,7 @@ const getColumnsNodeTypes = (
 
 type ColOperateType = "addBefore" | "addAfter" | "delete";
 const addOrDeleteCol = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dispatch: any,
   state: EditorState,
   type: ColOperateType
@@ -103,6 +113,7 @@ const addOrDeleteCol = (
 
     colsJSON.attrs.cols = colsJSON.content.length;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     colsJSON.content.forEach((colJSON: any, index: number) => {
       colJSON.attrs.index = index;
     });
@@ -110,7 +121,7 @@ const addOrDeleteCol = (
     const nextCols = PMNode.fromJSON(state.schema, colsJSON);
 
     let nextSelectPos = maybeColumns.pos;
-    nextCols.content.forEach((col, pos, index) => {
+    nextCols.content.forEach((col, _pos, index) => {
       if (index < nextIndex) {
         nextSelectPos += col.nodeSize;
       }
@@ -130,6 +141,7 @@ const addOrDeleteCol = (
 };
 
 type GotoColType = "before" | "after";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const gotoCol = (state: EditorState, dispatch: any, type: GotoColType) => {
   const maybeColumns = findParentNode(
     (node) => node.type.name === Columns.name
@@ -151,7 +163,7 @@ const gotoCol = (state: EditorState, dispatch: any, type: GotoColType) => {
     }
 
     let nextSelectPos = maybeColumns.pos;
-    cols.content.forEach((col, pos, index) => {
+    cols.content.forEach((col, _pos, index) => {
       if (index < nextIndex) {
         nextSelectPos += col.nodeSize;
       }
@@ -167,14 +179,21 @@ const gotoCol = (state: EditorState, dispatch: any, type: GotoColType) => {
   return false;
 };
 
-const Columns = Node.create({
+export interface ColumnsOptions {
+  HTMLAttributes: {
+    class: string;
+  };
+}
+
+const Columns = Node.create<ExtensionOptions & ColumnsOptions>({
   name: "columns",
   group: "block",
   priority: 10,
   defining: true,
   isolating: true,
-  allowGapCursor: false,
+  allowGapCursor: true,
   content: "column{1,}",
+  fakeSelection: false,
 
   addOptions() {
     return {
@@ -184,7 +203,7 @@ const Columns = Node.create({
       getToolboxItems({ editor }: { editor: Editor }) {
         return [
           {
-            priority: 50,
+            priority: 70,
             component: markRaw(ToolboxItem),
             props: {
               editor,
@@ -223,24 +242,33 @@ const Columns = Node.create({
       },
       getBubbleMenu() {
         return {
-          pluginKey: "columnsBubbleMenu",
-          shouldShow: ({ state }: { state: EditorState }) => {
+          pluginKey: COLUMNS_BUBBLE_MENU_KEY,
+          shouldShow: ({ state }: { state: EditorState }): boolean => {
             return isActive(state, Columns.name);
           },
-          getRenderContainer: (node: HTMLElement) => {
-            let container = node;
-            // 文本节点
-            if (container.nodeName === "#text") {
-              container = node.parentElement as HTMLElement;
+          options: {
+            placement: "bottom-start",
+          },
+          getReferencedVirtualElement() {
+            const editor = this.editor;
+            if (!editor) {
+              return null;
             }
-            while (
-              container &&
-              container.classList &&
-              !container.classList.contains("column")
-            ) {
-              container = container.parentElement as HTMLElement;
+            const parentNode = findParentNode(
+              (node) => node.type.name === Column.name
+            )(editor.state.selection);
+            if (parentNode) {
+              const domRect = posToDOMRect(
+                editor.view,
+                parentNode.pos,
+                parentNode.pos + parentNode.node.nodeSize
+              );
+              return {
+                getBoundingClientRect: () => domRect,
+                getClientRects: () => [domRect],
+              };
             }
-            return container;
+            return null;
           },
           items: [
             {
@@ -294,23 +322,6 @@ const Columns = Node.create({
           ],
         };
       },
-      getDraggable() {
-        return {
-          getRenderContainer({ dom }: { dom: HTMLElement }) {
-            let container = dom;
-            while (container && !container.classList.contains("columns")) {
-              container = container.parentElement as HTMLElement;
-            }
-            return {
-              el: container,
-              dragDomOffset: {
-                y: -5,
-              },
-            };
-          },
-          allowPropagationDownward: true,
-        };
-      },
     };
   },
 
@@ -321,7 +332,7 @@ const Columns = Node.create({
         parseHTML: (element) => element.getAttribute("cols"),
       },
       style: {
-        default: "display: flex;width: 100%;grid-gap: 8px;gap: 8px;",
+        default: "display: flex;width: 100%;gap: 1em;",
         parseHTML: (element) => element.getAttribute("style"),
       },
     };

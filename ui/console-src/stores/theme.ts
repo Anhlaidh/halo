@@ -1,21 +1,19 @@
-import { apiClient } from "@/utils/api-client";
 import type { Theme } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
+import { utils } from "@halo-dev/ui-shared";
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { usePermission } from "@/utils/permission";
 
 export const useThemeStore = defineStore("theme", () => {
   const activatedTheme = ref<Theme>();
 
-  const { currentUserHasPermission } = usePermission();
-
   async function fetchActivatedTheme() {
-    if (!currentUserHasPermission(["system:themes:view"])) {
+    if (!utils.permission.has(["system:themes:view"])) {
       return;
     }
 
     try {
-      const { data } = await apiClient.theme.fetchActivatedTheme({
+      const { data } = await consoleApiClient.theme.theme.fetchActivatedTheme({
         mute: true,
       });
 

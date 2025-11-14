@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import { apiClient } from "@/utils/api-client";
 import type { ListedAuthProvider } from "@halo-dev/api-client";
+import { consoleApiClient } from "@halo-dev/api-client";
 import {
   Dialog,
   IconList,
@@ -33,13 +33,13 @@ const handleChangeStatus = async () => {
     onConfirm: async () => {
       try {
         if (props.authProvider.enabled) {
-          await apiClient.authProvider.disableAuthProvider({
+          await consoleApiClient.auth.authProvider.disableAuthProvider({
             name: props.authProvider.name,
           });
 
           Toast.success(t("core.common.toast.inactive_success"));
         } else {
-          await apiClient.authProvider.enableAuthProvider({
+          await consoleApiClient.auth.authProvider.enableAuthProvider({
             name: props.authProvider.name,
           });
           Toast.success(t("core.common.toast.active_success"));
@@ -74,8 +74,18 @@ const handleChangeStatus = async () => {
         </template>
       </VEntityField>
       <VEntityField
-        :title="authProvider.displayName"
-        :description="authProvider.description"
+        :title="
+          $t(
+            `core.identity_authentication.fields.display_name.${authProvider.name}`,
+            authProvider.displayName
+          )
+        "
+        :description="
+          $t(
+            `core.identity_authentication.fields.description.${authProvider.name}`,
+            authProvider.description || ''
+          )
+        "
         :route="{
           name: 'AuthProviderDetail',
           params: { name: authProvider.name },

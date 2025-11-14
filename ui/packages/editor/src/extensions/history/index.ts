@@ -1,14 +1,13 @@
-import type { Editor } from "@/tiptap/vue-3";
-import TiptapHistory from "@tiptap/extension-history";
-import type { HistoryOptions } from "@tiptap/extension-history";
 import ToolbarItem from "@/components/toolbar/ToolbarItem.vue";
-import MdiUndoVariant from "~icons/mdi/undo-variant";
-import MdiRedoVariant from "~icons/mdi/redo-variant";
-import { markRaw } from "vue";
 import { i18n } from "@/locales";
+import type { Editor } from "@/tiptap";
 import type { ExtensionOptions } from "@/types";
+import { UndoRedo as TiptapHistory } from "@tiptap/extensions";
+import { markRaw } from "vue";
+import MdiRedoVariant from "~icons/mdi/redo-variant";
+import MdiUndoVariant from "~icons/mdi/undo-variant";
 
-const History = TiptapHistory.extend<ExtensionOptions & HistoryOptions>({
+const History = TiptapHistory.extend<ExtensionOptions>({
   addOptions() {
     return {
       ...this.parent?.(),

@@ -93,6 +93,11 @@ public class Post extends AbstractExtension {
         return labels != null && parseBoolean(labels.getOrDefault(PUBLISHED_LABEL, "false"));
     }
 
+    public static boolean isRecycled(MetadataOperator metadata) {
+        var labels = metadata.getLabels();
+        return labels != null && parseBoolean(labels.getOrDefault(DELETED_LABEL, "false"));
+    }
+
     public static boolean isPublic(PostSpec spec) {
         return spec.getVisible() == null || VisibleEnum.PUBLIC.equals(spec.getVisible());
     }
@@ -152,7 +157,6 @@ public class Post extends AbstractExtension {
 
     @Data
     public static class PostStatus {
-        @Schema(requiredMode = RequiredMode.REQUIRED)
         private String phase;
 
         @Schema
@@ -167,6 +171,11 @@ public class Post extends AbstractExtension {
         private Integer commentsCount;
 
         private List<String> contributors;
+
+        /**
+         * see {@link Category.CategorySpec#isHideFromList()}.
+         */
+        private Boolean hideFromList;
 
         private Instant lastModifyTime;
 

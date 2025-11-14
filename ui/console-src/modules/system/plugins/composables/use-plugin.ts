@@ -1,11 +1,20 @@
-import type { ComputedRef, Ref } from "vue";
-import { computed } from "vue";
-import { type Plugin, PluginStatusPhaseEnum } from "@halo-dev/api-client";
-import { cloneDeep } from "lodash-es";
-import { apiClient } from "@/utils/api-client";
+import { usePluginModuleStore } from "@/stores/plugin";
+import {
+  PluginStatusPhaseEnum,
+  consoleApiClient,
+  coreApiClient,
+  type Plugin,
+  type SettingForm,
+} from "@halo-dev/api-client";
 import { Dialog, Toast } from "@halo-dev/components";
+import { utils, type PluginTab } from "@halo-dev/ui-shared";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { useRouteQuery } from "@vueuse/router";
+import type { ComputedRef, Ref } from "vue";
+import { computed, markRaw, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
-import { useMutation } from "@tanstack/vue-query";
+import DetailTab from "../components/tabs/Detail.vue";
+import SettingTab from "../components/tabs/Setting.vue";
 
 interface usePluginLifeCycleReturn {
   isStarted: ComputedRef<boolean | undefined>;
@@ -76,7 +85,7 @@ export function usePluginLifeCycle(
 
       const { enabled } = plugin.value.spec;
 
-      return await apiClient.plugin.changePluginRunningState({
+      return await consoleApiClient.plugin.plugin.changePluginRunningState({
         name: plugin.value.metadata.name,
         pluginRunningStateRequest: {
           enable: !enabled,
@@ -117,16 +126,14 @@ export function usePluginLifeCycle(
         if (!plugin.value) return;
 
         try {
-          if (enabled) {
-            const pluginToUpdate = cloneDeep(plugin.value);
-            pluginToUpdate.spec.enabled = false;
-            await apiClient.extension.plugin.updatePluginHaloRunV1alpha1Plugin({
-              name: pluginToUpdate.metadata.name,
-              plugin: pluginToUpdate,
-            });
-          }
+          await consoleApiClient.plugin.plugin.changePluginRunningState({
+            name: plugin.value.metadata.name,
+            pluginRunningStateRequest: {
+              enable: false,
+            },
+          });
 
-          await apiClient.extension.plugin.deletePluginHaloRunV1alpha1Plugin({
+          await coreApiClient.plugin.plugin.deletePlugin({
             name: plugin.value.metadata.name,
           });
 
@@ -135,7 +142,7 @@ export function usePluginLifeCycle(
             const { settingName, configMapName } = plugin.value.spec;
 
             if (settingName) {
-              await apiClient.extension.setting.deleteV1alpha1Setting(
+              await coreApiClient.setting.deleteSetting(
                 {
                   name: settingName,
                 },
@@ -146,7 +153,7 @@ export function usePluginLifeCycle(
             }
 
             if (configMapName) {
-              await apiClient.extension.configMap.deleteV1alpha1ConfigMap(
+              await coreApiClient.configMap.deleteConfigMap(
                 {
                   name: configMapName,
                 },
@@ -196,22 +203,20 @@ export function usePluginBatchOperations(names: Ref<string[]>) {
       onConfirm: async () => {
         try {
           for (let i = 0; i < names.value.length; i++) {
-            await apiClient.extension.plugin.deletePluginHaloRunV1alpha1Plugin({
+            await coreApiClient.plugin.plugin.deletePlugin({
               name: names.value[i],
             });
 
             if (deleteExtensions) {
               const { data: plugin } =
-                await apiClient.extension.plugin.getPluginHaloRunV1alpha1Plugin(
-                  {
-                    name: names.value[i],
-                  }
-                );
+                await coreApiClient.plugin.plugin.getPlugin({
+                  name: names.value[i],
+                });
 
               const { settingName, configMapName } = plugin.spec;
 
               if (settingName) {
-                await apiClient.extension.setting.deleteV1alpha1Setting(
+                await coreApiClient.setting.deleteSetting(
                   {
                     name: settingName,
                   },
@@ -222,7 +227,7 @@ export function usePluginBatchOperations(names: Ref<string[]>) {
               }
 
               if (configMapName) {
-                await apiClient.extension.configMap.deleteV1alpha1ConfigMap(
+                await coreApiClient.configMap.deleteConfigMap(
                   {
                     name: configMapName,
                   },
@@ -252,7 +257,7 @@ export function usePluginBatchOperations(names: Ref<string[]>) {
       onConfirm: async () => {
         try {
           for (let i = 0; i < names.value.length; i++) {
-            await apiClient.plugin.changePluginRunningState({
+            await consoleApiClient.plugin.plugin.changePluginRunningState({
               name: names.value[i],
               pluginRunningStateRequest: {
                 enable: enabled,
@@ -269,4 +274,105 @@ export function usePluginBatchOperations(names: Ref<string[]>) {
   }
 
   return { handleUninstallInBatch, handleChangeStatusInBatch };
+}
+
+export function usePluginDetailTabs(
+  pluginName: Ref<string | undefined>,
+  recordsActiveTab: boolean
+) {
+  const { t } = useI18n();
+
+  const initialTabs = [
+    {
+      id: "detail",
+      label: t("core.plugin.tabs.detail"),
+      component: markRaw(DetailTab),
+    },
+  ];
+
+  const tabs = shallowRef<PluginTab[]>(initialTabs);
+  const activeTab = recordsActiveTab
+    ? useRouteQuery<string>("tab", tabs.value[0].id)
+    : ref(tabs.value[0].id);
+
+  const { data: plugin } = useQuery({
+    queryKey: ["plugin", pluginName],
+    queryFn: async () => {
+      const { data } = await coreApiClient.plugin.plugin.getPlugin({
+        name: pluginName.value as string,
+      });
+      return data;
+    },
+    async onSuccess(data) {
+      if (
+        !data.spec.settingName ||
+        !utils.permission.has(["system:plugins:manage"])
+      ) {
+        tabs.value = [...initialTabs, ...(await getTabsFromExtensions())];
+      }
+    },
+  });
+
+  const { data: setting } = useQuery({
+    queryKey: ["plugin-setting", plugin],
+    queryFn: async () => {
+      const { data } = await consoleApiClient.plugin.plugin.fetchPluginSetting({
+        name: plugin.value?.metadata.name as string,
+      });
+      return data;
+    },
+    enabled: computed(() => {
+      return (
+        !!plugin.value &&
+        !!plugin.value.spec.settingName &&
+        utils.permission.has(["system:plugins:manage"])
+      );
+    }),
+    async onSuccess(data) {
+      if (data) {
+        const { forms } = data.spec;
+        tabs.value = [
+          ...initialTabs,
+          ...(await getTabsFromExtensions()),
+          ...forms.map((item: SettingForm) => {
+            return {
+              id: item.group,
+              label: item.label || "",
+              component: markRaw(SettingTab),
+            };
+          }),
+        ] as PluginTab[];
+      }
+    },
+  });
+
+  async function getTabsFromExtensions() {
+    const { pluginModuleMap } = usePluginModuleStore();
+
+    const currentPluginModule = pluginModuleMap[pluginName.value as string];
+
+    if (!currentPluginModule) {
+      return [];
+    }
+
+    const callbackFunction =
+      currentPluginModule?.extensionPoints?.["plugin:self:tabs:create"];
+
+    if (typeof callbackFunction !== "function") {
+      return [];
+    }
+
+    const pluginTabs = await callbackFunction();
+
+    return pluginTabs.filter((tab) => {
+      return utils.permission.has(tab.permissions || []);
+    });
+  }
+
+  return {
+    plugin,
+    setting,
+    tabs,
+    activeTab,
+  };
 }

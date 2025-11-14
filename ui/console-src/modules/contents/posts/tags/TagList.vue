@@ -1,28 +1,25 @@
 <script lang="ts" setup>
 import type { Tag } from "@halo-dev/api-client";
-import { onMounted, ref, watch } from "vue";
+import { coreApiClient } from "@halo-dev/api-client";
 import {
   IconAddCircle,
   IconBookRead,
+  IconRefreshLine,
   VButton,
   VCard,
   VEmpty,
-  VPageHeader,
-  VSpace,
+  VEntityContainer,
   VLoading,
+  VPageHeader,
   VPagination,
-  IconRefreshLine,
+  VSpace,
 } from "@halo-dev/components";
-import HasPermission from "@/components/permission/HasPermission.vue";
-import TagEditingModal from "./components/TagEditingModal.vue";
 import { useRouteQuery } from "@vueuse/router";
-import { apiClient } from "@/utils/api-client";
-import { usePostTag } from "./composables/use-post-tag";
-import TagListItem from "./components/TagListItem.vue";
-import SearchInput from "@/components/input/SearchInput.vue";
-import FilterCleanButton from "@/components/filter/FilterCleanButton.vue";
-import { computed } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import TagEditingModal from "./components/TagEditingModal.vue";
+import TagListItem from "./components/TagListItem.vue";
+import { usePostTag } from "./composables/use-post-tag";
 
 const { t } = useI18n();
 
@@ -142,11 +139,9 @@ const queryName = useRouteQuery("name");
 
 onMounted(async () => {
   if (queryName.value) {
-    const { data } = await apiClient.extension.tag.getContentHaloRunV1alpha1Tag(
-      {
-        name: queryName.value as string,
-      }
-    );
+    const { data } = await coreApiClient.content.tag.getTag({
+      name: queryName.value as string,
+    });
     selectedTag.value = data;
     editingModal.value = true;
   }
@@ -166,7 +161,7 @@ watch(selectedTagNames, (newVal) => {
   />
   <VPageHeader :title="$t('core.post_tag.title')">
     <template #icon>
-      <IconBookRead class="mr-2 self-center" />
+      <IconBookRead />
     </template>
     <template #actions>
       <VButton
@@ -175,7 +170,7 @@ watch(selectedTagNames, (newVal) => {
         @click="editingModal = true"
       >
         <template #icon>
-          <IconAddCircle class="h-full w-full" />
+          <IconAddCircle />
         </template>
         {{ $t("core.common.buttons.new") }}
       </VButton>
@@ -241,6 +236,10 @@ watch(selectedTagNames, (newVal) => {
                     ),
                     value: 'spec.displayName,asc',
                   },
+                  {
+                    label: t('core.post.tag.filters.sort.items.post_desc'),
+                    value: 'status.postCount,desc',
+                  },
                 ]"
               />
               <div class="flex flex-row gap-2">
@@ -270,9 +269,9 @@ watch(selectedTagNames, (newVal) => {
               <VButton @click="() => handleFetchTags">
                 {{ $t("core.common.buttons.refresh") }}
               </VButton>
-              <VButton type="primary" @click="editingModal = true">
+              <VButton type="secondary" @click="editingModal = true">
                 <template #icon>
-                  <IconAddCircle class="h-full w-full" />
+                  <IconAddCircle />
                 </template>
                 {{ $t("core.common.buttons.new") }}
               </VButton>
@@ -282,27 +281,24 @@ watch(selectedTagNames, (newVal) => {
       </Transition>
 
       <Transition appear name="fade">
-        <ul
-          class="box-border h-full w-full divide-y divide-gray-100"
-          role="list"
-        >
-          <li v-for="(tag, index) in tags" :key="index">
-            <TagListItem
-              :tag="tag"
-              :is-selected="selectedTag?.metadata.name === tag.metadata.name"
-              @editing="handleOpenEditingModal"
-              @delete="handleDelete"
-            >
-              <template #checkbox>
-                <input
-                  v-model="selectedTagNames"
-                  :value="tag.metadata.name"
-                  type="checkbox"
-                />
-              </template>
-            </TagListItem>
-          </li>
-        </ul>
+        <VEntityContainer>
+          <TagListItem
+            v-for="tag in tags"
+            :key="tag.metadata.name"
+            :tag="tag"
+            :is-selected="selectedTag?.metadata.name === tag.metadata.name"
+            @editing="handleOpenEditingModal"
+            @delete="handleDelete"
+          >
+            <template #checkbox>
+              <input
+                v-model="selectedTagNames"
+                :value="tag.metadata.name"
+                type="checkbox"
+              />
+            </template>
+          </TagListItem>
+        </VEntityContainer>
       </Transition>
       <template #footer>
         <VPagination

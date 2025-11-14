@@ -1,71 +1,4 @@
 core:
-  login:
-    title: 登录
-    fields:
-      username:
-        placeholder: 用户名
-      password:
-        placeholder: 密码
-      remember_me:
-        label: 保持登录会话
-    operations:
-      submit:
-        toast_success: 登录成功
-        toast_failed: 登录失败，用户名或密码错误
-        toast_csrf: CSRF Token 失效，请重新尝试
-      signup:
-        label: 没有账号
-        button: 立即注册
-      return_login:
-        label: 已有账号
-        button: 立即登录
-      return_site: 返回到首页
-      reset_password:
-        button: 找回密码
-    button: 登录
-    modal:
-      title: 重新登录
-  signup:
-    title: 注册
-    fields:
-      username:
-        placeholder: 用户名
-      display_name:
-        placeholder: 名称
-      email:
-        placeholder: 电子邮箱
-        matchFailed: 邮箱格式错误或服务商不受支持
-      verify_code:
-        placeholder: 验证码
-        operations:
-          send_code:
-            buttons:
-              sending: 发送中
-              send: 发送验证码
-              countdown: "{timer} 秒后重发"
-            toast_success: 验证码已发送
-            toast_email_empty: 请输入电子邮箱
-      password:
-        placeholder: 密码
-      password_confirm:
-        placeholder: 确认密码
-    operations:
-      submit:
-        button: 注册
-        toast_success: 注册成功
-  binding:
-    title: 账号绑定
-    common:
-      toast:
-        mounted: 当前登录方式未绑定账号，请先绑定或注册新账号
-    operations:
-      login_and_bind:
-        button: 登录并绑定
-      signup_and_bind:
-        button: 注册并绑定
-      bind:
-        toast_success: 绑定成功
-        toast_failed: 绑定失败，没有找到已启用的登录方式
   sidebar:
     search:
       placeholder: 搜索
@@ -89,14 +22,18 @@ core:
         overview: 概览
         backup: 备份
         tools: 工具
+        home: 首页
     operations:
       logout:
         tooltip: 退出登录
         title: 退出登录
+        description: 点击确定将跳转至退出登录页面，请确保正在编辑的内容已保存。
       profile:
         tooltip: 个人中心
       visit_homepage:
         title: 访问首页
+    profile:
+      aggregate_role: 聚合角色
   uc_sidebar:
     menu:
       items:
@@ -106,14 +43,13 @@ core:
     operations:
       console:
         tooltip: 管理控制台
+    profile:
+      aggregate_role: 聚合角色
   dashboard:
-    title: 仪表板
+    title: 仪表盘
     actions:
       setting: 设置
-      done: 完成
-      add_widget: 添加组件
     widgets:
-      modal_title: 小组件
       groups:
         post: 文章
         page: 页面
@@ -129,12 +65,14 @@ core:
           title: 最近文章
           visits: 访问量 {visits}
           comments: 评论 {comments}
-          publishTime: 发布日期 {publishTime}
+          empty:
+            title: 暂无已发布文章
+          comments-with-pending: " ({count} 条待审核)"
         notification:
           title: 通知
           empty:
             title: 当前没有未读的消息
-        quicklink:
+        quickaction:
           title: 快捷访问
           actions:
             user_center:
@@ -158,17 +96,72 @@ core:
               dialog_title: 刷新搜索引擎索引
               dialog_content: 此操作会对所有已发布的文章重新创建本地搜索引擎的索引。
               success_message: 刷新成功
-            evict_page_cache:
-              title: 刷新页面缓存
-              dialog_title: 刷新页面缓存
-              dialog_content: 此操作会清空所有页面的缓存。
-              success_message: 刷新成功
+          config:
+            fields:
+              enabled_items:
+                label: 启用的功能
         user_stats:
           title: 用户
         comment_stats:
           title: 评论
         views_stats:
           title: 浏览量
+        pending_comments:
+          title: 新评论
+          empty:
+            title: 暂无待审核评论
+        iframe:
+          title: 网页嵌入
+          empty:
+            title: 请在配置中输入 URL
+          config:
+            fields:
+              title:
+                label: 标题
+        stack:
+          title: 堆叠部件
+          operations:
+            add_widget:
+              button: 添加部件
+          config_modal:
+            title: 堆叠部件配置
+            fields:
+              auto_play:
+                label: 自动切换
+              auto_play_interval:
+                label: 自动切换间隔
+              widgets:
+                label: 部件
+            toast:
+              nest_warning: 不能将堆叠部件添加到堆叠部件中
+      common_form:
+        fields:
+          enable_animation:
+            label: 启用动画
+  dashboard_designer:
+    title: 编辑仪表盘
+    actions:
+      add_widget: 添加部件
+    widgets_modal:
+      title: 小部件
+    config_modal:
+      title: 部件配置
+    operations:
+      back:
+        title: 布局未保存
+        description: 当前编辑的布局还未保存，放弃后，当前布局将丢失，是否继续？
+        confirm_text: 放弃
+      change_breakpoint:
+        tips_not_saved: 请先保存当前布局
+      copy_from_layout:
+        button: 从其他布局复制
+      open_widgets_hub:
+        button: 小部件中心
+    breakpoints:
+      lg: 桌面端
+      md: 平板端（横向）
+      sm: 平板端
+      xs: 手机端
   post:
     title: 文章
     actions:
@@ -185,6 +178,14 @@ core:
       delete_in_batch:
         title: 删除所选文章
         description: 该操作会将文章放入回收站，后续可以从回收站恢复。
+      publish_in_batch:
+        title: 发布文章
+        description: 批量发布文章，所选文章会被设置为发布状态
+      cancel_publish_in_batch:
+        title: 取消发布文章
+        description: 批量取消发布文章，所选文章会被设置为未发布状态
+      batch_setting:
+        button: 批量设置
     filters:
       status:
         items:
@@ -224,6 +225,7 @@ core:
         pinned: 已置顶
         schedule_publish:
           tooltip: 定时发布
+        comments-with-pending: （{count} 条待审核）
     settings:
       title: 文章设置
       groups:
@@ -259,6 +261,8 @@ core:
           label: 自定义模板
         cover:
           label: 封面图
+        owner:
+          label: 作者
     tag:
       filters:
         sort:
@@ -267,6 +271,28 @@ core:
             create_time_asc: 较早创建
             display_name_desc: 标签名降序
             display_name_asc: 标签名升序
+            post_desc: 最多文章量
+    batch_setting_modal:
+      title: 文章批量设置
+      fields:
+        common:
+          enabled: 启用
+          op:
+            label: 设置方式
+            options:
+              add: 追加
+              replace: 替换
+              remove_all: 移除全部
+        category_group: 分类
+        category_names: 选择分类
+        tag_group: 标签
+        tag_names: 选择标签
+        visible_group: 可见性
+        visible_value: 选择可见性
+        allow_comment_group: 允许评论
+        allow_comment_value: 选择是否允许评论
+        owner_group: 作者
+        owner_value: 设置作者
   deleted_post:
     title: 文章回收站
     empty:
@@ -297,6 +323,9 @@ core:
       cancel_publish:
         title: 取消发布
         description: 确定要取消发布吗？
+      delete:
+        title: 删除文章
+        description: 该操作会将文章放入回收站，后续由网站管理员进行管理。
   post_editor:
     title: 文章编辑
     untitled: 未命名文章
@@ -327,7 +356,7 @@ core:
           label: 名称
         slug:
           label: 别名
-          help: 通常用于生成分类的固定链接
+          help: 通常用于生成标签的固定链接
           refresh_message: 根据名称重新生成别名
         color:
           label: 颜色
@@ -362,16 +391,30 @@ core:
           label: 名称
         slug:
           label: 别名
-          help: 通常用于生成标签的固定链接
+          help: 通常用于生成分类的固定链接
           refresh_message: 根据名称重新生成别名
         template:
           label: 自定义模板
+          help: 自定义分类归档页面的渲染模版，需要主题提供支持
         cover:
           label: 封面图
           help: 需要主题适配以支持
         description:
           label: 描述
-          help: 需要主题适配以支持
+          help: 描述会自动添加到页面用于 SEO 的描述标签中，其他显示用途需要主题适配
+        prevent_parent_post_cascade_query:
+          label: 阻止文章级联查询
+          help: 阻止父级分类在级联文章查询中包含此分类及其子分类
+        post_template:
+          label: 自定义文章模板
+          help: 自定义当前分类下文章的渲染模版，需要主题提供支持
+        hide_from_list:
+          label: 在列表中隐藏
+          help: 开启此选项后，此分类和其下子分类，以及其下文章将不会显示在前台的列表中，需要主动访问分类归档页面，此功能仅对第一级目录生效
+    list:
+      fields:
+        prevent_parent_post_cascade_query: 阻止父级分类在级联文章查询中包含此分类及其子分类
+        hide_from_list: 已隐藏，此分类和其下子分类，以及其下文章将不会显示在前台的列表中
   page:
     title: 页面
     actions:
@@ -410,6 +453,7 @@ core:
       fields:
         visits: 访问量 {visits}
         comments: 评论 {comments}
+        comments-with-pending: （{count} 条待审核）
     settings:
       title: 页面设置
       groups:
@@ -440,7 +484,7 @@ core:
         cover:
           label: 封面图
   deleted_page:
-    title: 自定义页面回收站
+    title: 页面回收站
     empty:
       title: 没有自定义页面被放入回收站
       message: 你可以尝试刷新或者返回自定义页面管理
@@ -486,10 +530,16 @@ core:
         title: 确定要审核通过该评论的所有回复吗？
       delete_reply:
         title: 删除回复
-      approve_reply:
-        button: 审核通过
+      review:
+        button: 审核
       reply:
         button: 回复
+      approve:
+        button: 通过
+      reply_and_approve:
+        button: 回复并通过
+      cancel_approve:
+        button: 取消通过
     filters:
       status:
         items:
@@ -511,6 +561,7 @@ core:
         reply_count: "{count} 条回复"
         has_new_replies: 有新的回复
         pending_review: 待审核
+        private: 私密
     subject_refs:
       post: 文章
       page: 页面
@@ -523,6 +574,25 @@ core:
       operations:
         submit:
           toast_success: 回复成功
+    text:
+      commented_on: 评论在
+      replied_below: 回复：
+    detail_modal:
+      fields:
+        owner: 评论者
+        creation_time: 评论时间
+        commented_on: 评论在
+        new_reply: 新回复
+        user_agent: 用户代理（UA）
+    comment_detail_modal:
+      title: 评论详情
+      fields:
+        content: 评论内容
+    reply_detail_modal:
+      title: 回复详情
+      fields:
+        original_comment: 原评论
+        content: 回复内容
   attachment:
     title: 附件库
     common:
@@ -577,17 +647,20 @@ core:
         preview: 预览
         storage_policy: 存储策略
         group: 所在分组
-        display_name: 文件名称
+        display_name: 附件名称
         media_type: 文件类型
         size: 文件大小
         owner: 上传者
         creation_time: 上传时间
         permalink: 链接
+        thumbnails: 缩略图
+      display_name_form:
+        help: 自定义附件名称，仅用于管理界面显示，不会影响文件本身名称以及访问链接
       preview:
-        click_to_exit: 点击退出预览
         video_not_support: 当前浏览器不支持该视频播放
         audio_not_support: 当前浏览器不支持该音频播放
         not_support: 此文件不支持预览
+        not_support_thumbnail: 此图片不支持生成缩略图
     group_editing_modal:
       titles:
         create: 新增附件分组
@@ -595,6 +668,8 @@ core:
       fields:
         display_name:
           label: 名称
+      toast:
+        group_name_exists: 分组名称已存在
     group_list:
       internal_groups:
         all: 全部
@@ -630,6 +705,16 @@ core:
       fields:
         display_name:
           label: 名称
+        config:
+          label: 策略配置
+        hidden:
+          label: 在上传界面隐藏
+          help: 开启后，会在上传界面隐藏该存储策略
+        priority:
+          help: 设置在上传界面的显示优先级，数字越大，排序越靠前
+          label: 上传界面显示优先级
+      toast:
+        policy_name_exists: 存储策略名称已存在
     upload_modal:
       title: 上传附件
       filters:
@@ -641,6 +726,62 @@ core:
             title: 没有存储策略
             description: 在上传之前，需要新建一个存储策略
           not_select: 请先选择存储策略
+      upload_options:
+        local_upload: 本地上传
+        download: 通过链接下载
+      download_form:
+        fields:
+          url:
+            label: 链接地址
+        toast:
+          success: 下载成功
+    select_modal:
+      title: 选择附件
+      providers:
+        default:
+          label: 附件库
+      operations:
+        select:
+          result: （已选择 {count} 项）
+    permalink_list:
+      relative: 相对路径
+      absolute: 完整路径
+  uc_attachment:
+    empty:
+      title: 当前没有附件
+      message: 当前没有附件，你可以尝试刷新或者上传附件
+      actions:
+        upload: 上传附件
+    filters:
+      sort:
+        items:
+          create_time_desc: 较近上传
+          create_time_asc: 较晚上传
+          size_desc: 文件大小降序
+          size_asc: 文件大小升序
+          display_name_asc: 文件名升序
+          display_name_desc: 文件名降序
+      view_type:
+        items:
+          grid: 网格模式
+          list: 列表模式
+    detail_modal:
+      title: 附件：{display_name}
+      fields:
+        preview: 预览
+        display_name: 文件名称
+        media_type: 文件类型
+        size: 文件大小
+        owner: 上传者
+        creation_time: 上传时间
+        permalink: 链接
+      preview:
+        click_to_exit: 点击退出预览
+        video_not_support: 当前浏览器不支持该视频播放
+        audio_not_support: 当前浏览器不支持该音频播放
+        not_support: 此文件不支持预览
+    upload_modal:
+      title: 上传附件
     select_modal:
       title: 选择附件
       providers:
@@ -691,6 +832,15 @@ core:
         button: 清理模板缓存
         title: 清除模板缓存
         description: 此功能适用于在运行时修改模板文件后，刷新缓存以查看最新网页结果。
+      export_configuration:
+        button: 导出主题配置
+      import_configuration:
+        button: 导入主题配置
+        version_mismatch:
+          title: 版本不匹配
+          description: 导入的配置文件版本与当前主题版本不匹配，这可能会导致兼容性问题。是否继续导入？
+        invalid_format: 无效的主题配置文件
+        mismatched_theme: 配置文件与所选主题不匹配
     list_modal:
       tabs:
         installed: 已安装
@@ -822,6 +972,8 @@ core:
       remote_download:
         title: 检测到了远程下载地址，是否需要下载？
         description: 请仔细鉴别此地址是否可信：{url}
+      reload_window:
+        button: 需要重载页面
     filters:
       status:
         items:
@@ -864,6 +1016,7 @@ core:
         repo: 源码仓库
         load_location: 存储位置
         issues: 问题反馈
+        creation_time: 安装时间
       operations:
         view_conditions:
           button: 查看最近状态
@@ -883,6 +1036,21 @@ core:
         reason: 原因
         message: 信息
         last_transition_time: 时间
+    extension-settings:
+      title: 扩展配置
+      extension-point-definition:
+        title: 扩展点定义
+      extension-definition:
+        empty:
+          title: 当前没有扩展点实现
+        operation:
+          use:
+            button: 使用
+    actions:
+      extension-point-settings: 扩展配置
+    list:
+      fields:
+        system_reserved: 系统保留
   user:
     title: 用户
     actions:
@@ -902,6 +1070,18 @@ core:
         title: 修改密码
       grant_permission:
         title: 分配角色
+      enable:
+        title: 启用
+        description: 确定要启用该用户吗？启用之后该用户将可以重新登录系统
+      enable_in_batch:
+        title: 启用
+        description: 确定要启用所选用户吗？启用后这些用户将可以重新登录系统
+      disable:
+        title: 禁用
+        description: 确定要禁用该用户吗？禁用后该用户将无法登录系统
+      disable_in_batch:
+        title: 禁用
+        description: 确定要禁用所选用户吗？禁用后这些用户将无法登录系统
     filters:
       role:
         label: 角色
@@ -944,6 +1124,9 @@ core:
         role:
           label: 角色
           placeholder: 请选择角色
+      roles_preview:
+        all: 当前所选角色包含所有权限
+        includes: 当前所选角色包含的权限：
     detail:
       title: 用户详情
       tabs:
@@ -953,6 +1136,8 @@ core:
           title: 修改资料
         change_password:
           title: 修改密码
+        grant_permission:
+          title: 分配角色
         profile:
           title: 个人中心
       fields:
@@ -967,6 +1152,8 @@ core:
           tooltip: 已验证
         email_not_verified:
           tooltip: 未验证
+    fields:
+      disabled: 已禁用
   role:
     title: 角色
     common:
@@ -1007,7 +1194,6 @@ core:
         permissions: 权限
       fields:
         display_name: 名称
-        redirect_on_login: 登录之后默认跳转位置
         disallow_access_console:
           label: 禁止访问 Console
           help: 勾选之后，该角色将无法访问 Console
@@ -1023,6 +1209,15 @@ core:
         title: 停用认证方式
       disable_privileged:
         tooltip: 系统保留的认证方式，无法禁用
+    fields:
+      display_name:
+        local: 账号密码登录
+      description:
+        local: Halo 内置的默认登录方式
+    list:
+      types:
+        form: 基础认证方式
+        oauth2: 三方认证方式
     detail:
       title: 身份认证详情
       fields:
@@ -1037,6 +1232,8 @@ core:
       detail: 详情
       notification-preferences: 通知配置
       pat: 个人令牌
+      2fa: 两步验证
+      devices: 登录设备
     actions:
       update_profile:
         title: 修改资料
@@ -1065,6 +1262,48 @@ core:
         description: 电子邮箱地址还未验证，点击下方按钮进行验证
       email_verified:
         tooltip: 已验证
+    2fa:
+      operations:
+        enable:
+          button: 启用两步验证
+          title: 启用两步验证
+        disable:
+          title: 禁用两步验证
+        disable_totp:
+          title: 停用 TOTP
+      password_validation_form:
+        fields:
+          password:
+            label: 验证密码
+            help: 当前账号的登录密码
+      methods:
+        title: 验证方式
+        totp:
+          title: TOTP
+          description: 使用 TOTP 应用程序配置两步验证
+          fields:
+            status:
+              configured: 已配置
+              not_configured: 未配置
+          operations:
+            reconfigure:
+              button: 重新配置
+            configure:
+              button: 配置
+              title: TOTP 配置
+              fields:
+                code:
+                  label: 验证码
+                  help: 从验证器应用获得的 6 位验证码
+                password:
+                  label: 验证密码
+                  help: 当前账号的登录密码
+                qrcode:
+                  label: 使用验证器应用扫描下方二维码：
+                manual:
+                  label: 如果无法扫描二维码，点击查看代替步骤
+                  help: 使用以下代码手动配置验证器应用：
+              tips: 请妥善保管您的两步验证设备，如果设备丢失或损坏，你将无法登录系统。建议你在多个设备上安装验证器应用，或保存好密钥的备份，以防主要设备无法使用。
     pat:
       operations:
         delete:
@@ -1160,6 +1399,27 @@ core:
           toast_email_empty: 请输入电子邮箱
         verify:
           toast_success: 验证成功
+    device:
+      list:
+        fields:
+          current: 当前设备
+          last_accessed_time: 上次访问：{time}
+      detail_modal:
+        title: 登录设备详情
+        fields:
+          os: 操作系统
+          browser: 浏览器
+          creation_timestamp: 创建时间
+          last_accessed_times: 上次访问时间
+          last_authenticated_time: 上次登录时间
+      operations:
+        revoke:
+          title: 撤销设备
+          description: 确定要撤销该设备吗？撤销之后，此设备会退出登录
+        revoke_others:
+          title: 撤销其他所有设备
+          description: 确定要撤销其他所有设备吗？撤销之后，其他设备会退出登录
+          toast_success: 已撤销其他设备的登录状态
   uc_notification:
     title: 消息
     tabs:
@@ -1175,6 +1435,12 @@ core:
       delete:
         title: 删除消息
         description: 确定要删除该消息吗？
+      delete_all:
+        title: 删除当前所有通知
+        description: 确定要删除当前所有通知吗？删除后将无法恢复。
+      mark_all_as_read:
+        title: 将当前所有通知标记为已读
+        description: 将当前所有通知标记为已读，是否继续？
   setting:
     title: 设置
   overview:
@@ -1189,8 +1455,8 @@ core:
     fields:
       external_url: 外部访问地址
       start_time: 启动时间
-      timezone: 系统时区
-      locale: 系统语言
+      timezone: 操作系统时区
+      locale: 操作系统语言
       version: 版本
       build_time: 构建时间
       database: 数据库
@@ -1210,7 +1476,13 @@ core:
       os: 操作系统：{os}
     alert:
       external_url_invalid: 检测到外部访问地址与当前访问地址不一致，可能会导致部分链接无法正常跳转，请检查外部访问地址设置。
-      h2_warning: H2 数据库仅用于开发环境和测试环境，不推荐在生产环境中使用 H2 数据库。如果必须要使用，请按时进行数据备份。
+    external_url_form:
+      operations:
+        save:
+          title: 修改外部访问地址
+          description: 修改外部访问地址需要重启 Halo 服务，修改完成之后会自动进行重启，是否继续？
+      tips:
+        restarting: 修改完成，等待重启...
   backup:
     title: 备份与恢复
     tabs:
@@ -1237,7 +1509,8 @@ core:
         button: 下载并恢复
       restore_by_backup:
         button: 恢复
-        title: 从此备份进行恢复
+        title: 从备份文件恢复
+        description: 点击确定后，将从备份文件 {filename} 恢复数据。
     list:
       phases:
         pending: 准备中
@@ -1249,10 +1522,10 @@ core:
     restore:
       tips:
         first: 1. 恢复过程可能会持续较长时间，期间请勿刷新页面。
-        second: 2. 在恢复的过程中，虽然已有的数据不会被清理掉，但如果有冲突的数据将被覆盖。
+        second: 2. 在执行恢复之前，会清空现有的所有数据，请确保当前没有需要保留的数据。
         third: 3. 恢复完成之后需要重启 Halo 才能够正常加载系统资源。
         complete: 恢复完成，等待重启...
-      start: 开始恢复
+      start: 我已阅读上方提示，开始恢复
       tabs:
         local:
           label: 上传
@@ -1261,7 +1534,10 @@ core:
           fields:
             url: 下载地址
         backup:
-          label: 从备份恢复
+          label: 从备份文件恢复
+          empty:
+            title: 没有备份文件
+            message: 当前没有扫描到备份文件，你可以手动将备份文件上传到 Halo 工作目录的 backups 目录。
   exception:
     not_found:
       message: 没有找到该页面
@@ -1269,49 +1545,6 @@ core:
       message: 没有权限访问此页面
     actions:
       home: 返回首页
-  setup:
-    title: 系统初始化
-    operations:
-      submit:
-        button: 初始化
-        toast_success: 初始化成功
-      setup_initial_data:
-        loading: 正在初始化数据，请稍后...
-    fields:
-      site_title:
-        label: 站点名称
-      email:
-        label: 邮箱
-      username:
-        label: 用户名
-      password:
-        label: 密码
-      confirm_password:
-        label: 确认密码
-  reset_password:
-    title: 重置密码
-    fields:
-      username:
-        label: 用户名
-      email:
-        label: 邮箱地址
-    operations:
-      send:
-        label: 发送验证邮件
-        toast_success: 如果你的用户名和邮箱地址匹配，我们将会发送一封邮件到你的邮箱。
-  uc_reset_password:
-    title: 重置密码
-    fields:
-      username:
-        label: 用户名
-      password:
-        label: 新密码
-      password_confirm:
-        label: 确认密码
-    operations:
-      reset:
-        button: 重置密码
-        toast_success: 重置成功
   rbac:
     Attachments Management: 附件
     Attachment Manage: 附件管理
@@ -1386,6 +1619,10 @@ core:
     Post Author: 允许管理自己的文章
     Post Attachment Manager: 允许在文章中上传图片
     Post Publisher: 允许发布自己的文章
+    UC Attachment Manage: 允许管理自己的附件
+    role-template-uc-attachment-manager: 允许管理自己的附件
+    Recycle My Post: 允许删除自己的文章
+    role-template-recycle-my-post: 允许删除自己的文章
   components:
     submit_button:
       computed_text: "{text}（{shortcut}）"
@@ -1426,10 +1663,23 @@ core:
           operations:
             replace:
               button: 替换
+            transfer:
+              button: 转存
+              tooltip: 检测到此资源为外部资源，点击此按钮以转存到附件库
+            transfer_in_batch:
+              description: 检测到具有外部链接，是否需要自动上传到附件库？
       toolbox:
         attachment: 选择附件
         show_hide_sidebar: 显示 / 隐藏侧边栏
       title_placeholder: 请输入标题
+      cover:
+        options:
+          add: 添加封面图
+          change: 更换
+          upload: 上传
+          attachment: 从附件库选择
+        toast:
+          upload_failed: "上传封面失败: {message}"
     global_search:
       placeholder: 输入关键词以搜索
       no_results: 没有搜索结果
@@ -1450,8 +1700,6 @@ core:
       page_label: 页
       size_label: 条 / 页
       total_label: 共 {total} 项数据
-    social_auth_providers:
-      title: 三方登录
     app_download_alert:
       description: Halo 的主题和插件可以在以下地址下载：
       sources:
@@ -1485,24 +1733,53 @@ core:
         aspect_ratio_square: 裁剪为正方形
         aspect_ratio_landscape: 裁剪为横向 (16:9)
         aspect_ratio_portrait: 裁剪为纵向 (9:16)
+    h2_warning_alert:
+      title: 警告：正在使用 H2 数据库
+      description: H2 数据库仅适用于开发环境和测试环境，不推荐在生产环境中使用，H2 非常容易因为操作不当导致数据文件损坏。如果必须要使用，请按时进行数据备份。
   composables:
     content_cache:
       toast_recovered: 已从缓存中恢复未保存的内容
   formkit:
+    select:
+      no_data: 暂无数据
     category_select:
       creation_label: 创建 {text} 分类
     tag_select:
       creation_label: 创建 {text} 标签
     validation:
       trim: 不能以空格开头或结尾
+      password: "密码只能使用大小写字母 (A-Z, a-z)、数字 (0-9)，以及以下特殊字符: !{'@'}#$%^&*"
     verification_form:
       no_action_defined: 未定义{label}接口
       verify_success: "{label}成功"
       verify_failed: "{label}失败"
+    secret:
+      creation_label: 根据输入的文本创建新密钥
+      placeholder: 搜索已存在的密钥或者输入内容以创建新的密钥
+      required_key_missing_label: 缺少当前选项所需的字段，请选择之后补充完整
+      creation_modal:
+        title: 创建密钥
+      edit_modal:
+        title: 编辑密钥
+      list_modal:
+        title: 管理密钥
+      operations:
+        delete:
+          title: 删除密钥
+          description: 确定删除此密钥吗？请确保没有地方正在使用此密钥，否则需要在具体的地方重新设置
+      form:
+        fields:
+          description: 备注
+          string_data: 字符串数据
+    code:
+      fullscreen:
+        exit: 退出全屏
+        enter: 全屏编辑
   common:
     buttons:
       save: 保存
       close: 关闭
+      save_and_continue: 保存并继续添加
       close_and_shortcut: 关闭（Esc）
       delete: 删除
       setting: 设置
@@ -1538,6 +1815,11 @@ core:
       modify: 修改
       access: 访问
       schedule_publish: 定时发布
+      revoke: 撤销
+      disable: 禁用
+      enable: 启用
+      continue: 继续
+      retry: 重试
     radio:
       "yes": 是
       "no": 否
@@ -1570,13 +1852,17 @@ core:
       not_found: 资源不存在
       server_internal_error: 服务器内部错误
       unknown_error: 未知错误
+      disable_success: 禁用成功
+      enable_success: 启用成功
     dialog:
       titles:
         tip: 提示
         warning: 警告
+        login_expired: 登录已过期
       descriptions:
         cannot_be_recovered: 该操作不可恢复。
         editor_not_found: 未找到符合 {raw_type} 格式的编辑器，请检查是否已安装编辑器插件。
+        login_expired: 当前登录已过期，点击确定跳转到登录页面，请确保当前内容已保存，你可以点击取消之后手动复制未保存的内容。
     filters:
       results:
         keyword: 关键词：{keyword}
@@ -1601,12 +1887,18 @@ core:
       none: 无
       tip: 提示
       warning: 警告
+      system_protection: 系统保留
+      all: 全部
+      detail: 详情
     tooltips:
       unpublished_content_tip: 当前有内容已保存，但还未发布。
       publishing: 发布中
       recovering: 恢复中
     fields:
       post_count: "{count} 篇文章"
+    form:
+      validation:
+        slug_unique: 当前别名已存在
   tool:
     title: 工具
     empty:

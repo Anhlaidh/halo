@@ -1,4 +1,11 @@
 <script lang="ts" setup>
+import { useRoleForm, useRoleTemplateSelection } from "@/composables/use-role";
+import { rbacAnnotations } from "@/constants/annotations";
+import { SUPER_ROLE_NAME } from "@/constants/constants";
+import { pluginLabels, roleLabels } from "@/constants/labels";
+import { resolveDeepDependencies } from "@/utils/role";
+import type { Role } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
 import {
   IconShieldUser,
   VAlert,
@@ -10,18 +17,11 @@ import {
   VTabbar,
   VTag,
 } from "@halo-dev/components";
-import { useRoute } from "vue-router";
-import { computed, ref, watch } from "vue";
-import { apiClient } from "@/utils/api-client";
-import { pluginLabels, roleLabels } from "@/constants/labels";
-import { rbacAnnotations } from "@/constants/annotations";
-import { useRoleForm, useRoleTemplateSelection } from "@/composables/use-role";
-import { SUPER_ROLE_NAME } from "@/constants/constants";
-import { useI18n } from "vue-i18n";
-import { formatDatetime } from "@/utils/date";
+import { utils } from "@halo-dev/ui-shared";
 import { useQuery } from "@tanstack/vue-query";
-import type { Role } from "packages/api-client/dist";
-import { resolveDeepDependencies } from "@/utils/role";
+import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 
 const route = useRoute();
 const { t } = useI18n();
@@ -31,7 +31,7 @@ const tabActiveId = ref("detail");
 const { data: roleTemplates } = useQuery({
   queryKey: ["role-templates"],
   queryFn: async () => {
-    const { data } = await apiClient.extension.role.listV1alpha1Role({
+    const { data } = await coreApiClient.role.listRole({
       page: 0,
       size: 0,
       labelSelector: [`${roleLabels.TEMPLATE}=true`, "!halo.run/hidden"],
@@ -64,8 +64,6 @@ const getRoleCountText = computed(() => {
     resolveDeepDependencies(formState.value, roleTemplates.value || [])
   );
 
-  console.log(dependencies);
-
   return t("core.role.common.text.contains_n_permissions", {
     count: dependencies.size || 0,
   });
@@ -84,7 +82,7 @@ watch(
 const { refetch } = useQuery<Role>({
   queryKey: ["role", route.params.name],
   queryFn: async () => {
-    const { data } = await apiClient.extension.role.getV1alpha1Role({
+    const { data } = await coreApiClient.role.getRole({
       name: route.params.name as string,
     });
     return data;
@@ -106,7 +104,7 @@ const handleUpdateRole = async () => {
 <template>
   <VPageHeader :title="$t('core.role.detail.title')">
     <template #icon>
-      <IconShieldUser class="mr-2 self-center" />
+      <IconShieldUser />
     </template>
   </VPageHeader>
   <div class="m-0 md:m-4">
@@ -162,7 +160,7 @@ const handleUpdateRole = async () => {
             </VDescriptionItem>
             <VDescriptionItem
               :label="$t('core.role.detail.fields.creation_time')"
-              :content="formatDatetime(formState.metadata.creationTimestamp)"
+              :content="utils.date.format(formState.metadata.creationTimestamp)"
             />
           </VDescription>
         </div>
@@ -185,8 +183,8 @@ const handleUpdateRole = async () => {
         <div>
           <dl class="divide-y divide-gray-100">
             <div
-              v-for="(group, groupIndex) in roleTemplateGroups"
-              :key="groupIndex"
+              v-for="(group, index) in roleTemplateGroups"
+              :key="index"
               class="bg-white px-4 py-5 hover:bg-gray-50 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6"
             >
               <dt class="text-sm font-medium text-gray-900">
@@ -226,7 +224,7 @@ const handleUpdateRole = async () => {
               </dt>
               <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
                 <ul class="space-y-2">
-                  <li v-for="(role, index) in group.roles" :key="index">
+                  <li v-for="role in group.roles" :key="role.metadata.name">
                     <label
                       class="inline-flex w-72 cursor-pointer flex-row items-center gap-4 rounded-base border p-5 hover:border-primary"
                     >

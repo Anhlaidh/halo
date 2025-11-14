@@ -1,25 +1,18 @@
 import { rbacAnnotations } from "@/constants/annotations";
 import { roleLabels } from "@/constants/labels";
-import { apiClient } from "@/utils/api-client";
 import type { FormKitNode, FormKitTypeDefinition } from "@formkit/core";
-import { select, selects, defaultIcon } from "@formkit/inputs";
-import { i18n } from "@/locales";
+import { coreApiClient } from "@halo-dev/api-client";
+import { select } from "./select";
 
 function optionsHandler(node: FormKitNode) {
   node.on("created", async () => {
-    const { data } = await apiClient.extension.role.listV1alpha1Role({
+    const { data } = await coreApiClient.role.listRole({
       page: 0,
       size: 0,
       labelSelector: [`!${roleLabels.TEMPLATE}`],
     });
 
-    node.props.options = [
-      {
-        label: i18n.global.t(
-          "core.user.grant_permission_modal.fields.role.placeholder"
-        ),
-        value: "",
-      },
+    const options = [
       ...data.items.map((role) => {
         return {
           label:
@@ -29,12 +22,14 @@ function optionsHandler(node: FormKitNode) {
         };
       }),
     ];
+    if (node.context) {
+      node.context.attrs.options = options;
+    }
   });
 }
 
 export const roleSelect: FormKitTypeDefinition = {
   ...select,
-  props: ["placeholder"],
   forceTypeProp: "select",
-  features: [optionsHandler, selects, defaultIcon("select", "select")],
+  features: [optionsHandler],
 };

@@ -28,7 +28,7 @@ import java.util.Set;
  */
 @JsonSerialize(using = JsonExtension.ObjectNodeExtensionSerializer.class)
 @JsonDeserialize(using = JsonExtension.ObjectNodeExtensionDeSerializer.class)
-class JsonExtension implements Extension {
+public class JsonExtension implements Extension {
 
     private final ObjectMapper objectMapper;
 
@@ -110,6 +110,15 @@ class JsonExtension implements Extension {
      */
     public ObjectNode getInternal() {
         return objectNode;
+    }
+
+    /**
+     * Get object mapper.
+     *
+     * @return object mapper
+     */
+    public ObjectMapper getObjectMapper() {
+        return objectMapper;
     }
 
     public MetadataOperator getMetadataOrCreate() {
@@ -245,6 +254,21 @@ class JsonExtension implements Extension {
             if (finalizers != null) {
                 objectNode.set("finalizers", objectMapper.valueToTree(finalizers));
             }
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+
+            ObjectNodeMetadata that = (ObjectNodeMetadata) o;
+            return Objects.equals(objectNode, that.objectNode);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(objectNode);
         }
     }
 }

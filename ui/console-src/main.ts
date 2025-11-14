@@ -1,59 +1,55 @@
-import { createApp } from "vue";
-import type { DirectiveBinding } from "vue";
-import { createPinia } from "pinia";
-import App from "./App.vue";
-import router from "./router";
-import { apiClient } from "@/utils/api-client";
-// setup
-import "@/setup/setupStyles";
+import { setLanguage, setupI18n } from "@/locales";
+import { setupApiClient } from "@/setup/setupApiClient";
 import { setupComponents } from "@/setup/setupComponents";
-import { setupI18n, i18n, getBrowserLanguage } from "@/locales";
-// core modules
-import { hasPermission } from "@/utils/permission";
-import { useRoleStore } from "@/stores/role";
-import { useThemeStore } from "@console/stores/theme";
-import { useUserStore } from "@/stores/user";
-import { useSystemConfigMapStore } from "@console/stores/system-configmap";
+import "@/setup/setupStyles";
 import { setupVueQuery } from "@/setup/setupVueQuery";
-import { useGlobalInfoStore } from "@/stores/global-info";
+import { useRoleStore } from "@/stores/role";
 import {
   setupCoreModules,
   setupPluginModules,
 } from "@console/setup/setupModules";
+import { useThemeStore } from "@console/stores/theme";
+import { consoleApiClient } from "@halo-dev/api-client";
+import { stores, utils } from "@halo-dev/ui-shared";
+import "core-js/es/object/has-own";
+import { createPinia } from "pinia";
+import type { DirectiveBinding } from "vue";
+import { createApp } from "vue";
+import App from "./App.vue";
+import router from "./router";
 
 const app = createApp(App);
 
 setupComponents(app);
 setupI18n(app);
 setupVueQuery(app);
+setupApiClient();
 
 app.use(createPinia());
 
 async function loadUserPermissions() {
-  const { data: currentPermissions } = await apiClient.user.getPermissions({
-    name: "-",
-  });
+  const { data: currentPermissions } =
+    await consoleApiClient.user.getPermissions({
+      name: "-",
+    });
   const roleStore = useRoleStore();
   roleStore.$patch({
     permissions: currentPermissions,
   });
+
+  // Set permissions in shared utils
+  utils.permission.setUserPermissions(currentPermissions.uiPermissions);
+
   app.directive(
     "permission",
     (el: HTMLElement, binding: DirectiveBinding<string[]>) => {
-      const uiPermissions = Array.from<string>(
-        currentPermissions.uiPermissions
-      );
       const { value } = binding;
-      const { any, enable } = binding.modifiers;
+      const { any } = binding.modifiers;
 
-      if (hasPermission(uiPermissions, value, any)) {
+      if (utils.permission.has(value, any ?? false)) {
         return;
       }
 
-      if (enable) {
-        //TODO
-        return;
-      }
       el?.remove?.();
     }
   );
@@ -72,17 +68,15 @@ async function initApp() {
   try {
     setupCoreModules(app);
 
-    const userStore = useUserStore();
-    await userStore.fetchCurrentUser();
+    const currentUserStore = stores.currentUser();
+    await currentUserStore.fetchCurrentUser();
 
-    // set locale
-    i18n.global.locale.value =
-      localStorage.getItem("locale") || getBrowserLanguage();
-
-    const globalInfoStore = useGlobalInfoStore();
+    const globalInfoStore = stores.globalInfo();
     await globalInfoStore.fetchGlobalInfo();
 
-    if (userStore.isAnonymous) {
+    await setLanguage();
+
+    if (currentUserStore.isAnonymous) {
       return;
     }
 
@@ -93,10 +87,6 @@ async function initApp() {
     } catch (e) {
       console.error("Failed to load plugins", e);
     }
-
-    // load system configMap
-    const systemConfigMapStore = useSystemConfigMapStore();
-    await systemConfigMapStore.fetchSystemConfigMap();
 
     if (globalInfoStore.globalInfo?.userInitialized) {
       await loadActivatedTheme();

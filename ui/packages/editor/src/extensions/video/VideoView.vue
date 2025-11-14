@@ -1,20 +1,10 @@
 <script lang="ts" setup>
-import type { Node as ProseMirrorNode, Decoration } from "@/tiptap/pm";
-import type { Editor, Node } from "@/tiptap/vue-3";
+import { i18n } from "@/locales";
+import type { NodeViewProps } from "@/tiptap/vue-3";
 import { NodeViewWrapper } from "@/tiptap/vue-3";
 import { computed, onMounted, ref } from "vue";
-import { i18n } from "@/locales";
 
-const props = defineProps<{
-  editor: Editor;
-  node: ProseMirrorNode;
-  decorations: Decoration[];
-  selected: boolean;
-  extension: Node<any, any>;
-  getPos: () => number;
-  updateAttributes: (attributes: Record<string, any>) => void;
-  deleteNode: () => void;
-}>();
+const props = defineProps<NodeViewProps>();
 
 const src = computed({
   get: () => {
@@ -38,7 +28,7 @@ const loop = computed(() => {
 });
 
 function handleSetFocus() {
-  props.editor.commands.setNodeSelection(props.getPos());
+  props.editor.commands.setNodeSelection(props.getPos() ?? 0);
 }
 
 const inputRef = ref();
@@ -53,7 +43,7 @@ onMounted(() => {
 <template>
   <node-view-wrapper as="div" class="inline-block w-full">
     <div
-      class="inline-block overflow-hidden transition-all text-center relative h-full max-w-full"
+      class="relative inline-block h-full max-w-full overflow-hidden text-center transition-all"
       :style="{
         width: node.attrs.width,
       }"
@@ -62,7 +52,7 @@ onMounted(() => {
         <input
           ref="inputRef"
           v-model.lazy="src"
-          class="block px-2 w-full py-1.5 text-sm text-gray-900 border border-gray-300 rounded-md bg-gray-50 focus:ring-blue-500 focus:border-blue-500"
+          class="block w-full rounded-md border border-gray-300 bg-gray-50 px-2 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500"
           :placeholder="i18n.global.t('editor.common.placeholder.link_input')"
           tabindex="-1"
           @focus="handleSetFocus"
@@ -73,7 +63,7 @@ onMounted(() => {
         :controls="controls"
         :autoplay="autoplay"
         :loop="loop"
-        class="rounded-md m-0"
+        class="m-0 rounded-md"
         :src="node!.attrs.src"
         :style="{
           width: node.attrs.width,

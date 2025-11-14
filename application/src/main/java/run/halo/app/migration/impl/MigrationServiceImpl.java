@@ -1,6 +1,8 @@
 package run.halo.app.migration.impl;
 
 import static java.nio.file.Files.deleteIfExists;
+import static java.util.Comparator.comparing;
+import static org.apache.commons.io.FilenameUtils.isExtension;
 import static org.springframework.util.FileSystemUtils.copyRecursively;
 import static run.halo.app.infra.utils.FileUtils.checkDirectoryTraversal;
 import static run.halo.app.infra.utils.FileUtils.copyRecursively;
@@ -19,13 +21,16 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.BaseStream;
 import lombok.extern.slf4j.Slf4j;
 import org.reactivestreams.Publisher;
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.ReactiveTransactionManager;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebInputException;
 import reactor.core.Exceptions;
@@ -40,11 +45,12 @@ import run.halo.app.infra.exception.NotFoundException;
 import run.halo.app.infra.properties.HaloProperties;
 import run.halo.app.infra.utils.FileUtils;
 import run.halo.app.migration.Backup;
+import run.halo.app.migration.BackupFile;
 import run.halo.app.migration.MigrationService;
 
 @Slf4j
 @Service
-public class MigrationServiceImpl implements MigrationService {
+public class MigrationServiceImpl implements MigrationService, InitializingBean {
 
     private final ExtensionStoreRepository repository;
 
@@ -54,18 +60,22 @@ public class MigrationServiceImpl implements MigrationService {
 
     private final ObjectMapper objectMapper;
 
+    private final ReactiveTransactionManager txManager;
+
     private final Set<String> excludes = Set.of(
         "**/.git/**",
         "**/node_modules/**",
         "backups/**",
         "db/**",
         "logs/**",
+        "indices/**",
         "docker-compose.yaml",
         "docker-compose.yml",
         "mysql/**",
         "mysqlBackup/**",
         "**/.idea/**",
-        "**/.vscode/**"
+        "**/.vscode/**",
+        "attachments/thumbnails/**"
     );
 
     private final DateTimeFormatter dateTimeFormatter;
@@ -73,10 +83,12 @@ public class MigrationServiceImpl implements MigrationService {
     private final Scheduler scheduler = Schedulers.boundedElastic();
 
     public MigrationServiceImpl(ExtensionStoreRepository repository,
-        HaloProperties haloProperties, BackupRootGetter backupRoot) {
+        HaloProperties haloProperties, BackupRootGetter backupRoot,
+        ReactiveTransactionManager txManager) {
         this.repository = repository;
         this.haloProperties = haloProperties;
         this.backupRoot = backupRoot;
+        this.txManager = txManager;
         this.objectMapper = JsonMapper.builder()
             .defaultPrettyPrinter(new MinimalPrettyPrinter())
             .build();
@@ -131,12 +143,21 @@ public class MigrationServiceImpl implements MigrationService {
     }
 
     @Override
-    @Transactional
     public Mono<Void> restore(Publisher<DataBuffer> content) {
+        var tx = TransactionalOperator.create(txManager);
         return Mono.usingWhen(
             createTempDir("halo-restore-", scheduler),
             tempDir -> unpackBackup(content, tempDir)
-                .then(Mono.defer(() -> restoreExtensions(tempDir)))
+                .then(Mono.defer(() ->
+                    // This step skips index verification such as unique index.
+                    // In order to avoid index conflicts after recovery or
+                    // OptimisticLockingFailureException when updating the same record,
+                    // so we need to truncate all extension stores before saving(create or
+                    // update).
+                    repository.deleteAll()
+                        .then(restoreExtensions(tempDir))
+                        .as(tx::transactional)
+                ))
                 .then(Mono.defer(() -> restoreWorkdir(tempDir))),
             tempDir -> deleteRecursivelyAndSilently(tempDir, scheduler)
         );
@@ -163,6 +184,49 @@ public class MigrationServiceImpl implements MigrationService {
         }).subscribeOn(scheduler);
     }
 
+    @Override
+    public Flux<BackupFile> getBackupFiles() {
+        return Flux.using(
+                () -> Files.list(getBackupsRoot()),
+                Flux::fromStream,
+                BaseStream::close
+            )
+            .filter(Files::isRegularFile)
+            .filter(Files::isReadable)
+            .filter(path -> isExtension(path.getFileName().toString(), "zip"))
+            .map(this::toBackupFile)
+            .sort(comparing(BackupFile::getLastModifiedTime).reversed()
+                .thenComparing(BackupFile::getFilename)
+            )
+            .subscribeOn(this.scheduler);
+    }
+
+    @Override
+    public Mono<BackupFile> getBackupFile(String filename) {
+        return Mono.fromCallable(() -> {
+            var backupsRoot = getBackupsRoot();
+            var backupFilePath = backupsRoot.resolve(filename);
+            checkDirectoryTraversal(backupsRoot, backupFilePath);
+            if (Files.notExists(backupFilePath)) {
+                return null;
+            }
+            return toBackupFile(backupFilePath);
+        }).subscribeOn(this.scheduler);
+    }
+
+    private BackupFile toBackupFile(Path path) {
+        var backupFile = new BackupFile();
+        backupFile.setPath(path);
+        backupFile.setFilename(path.getFileName().toString());
+        try {
+            backupFile.setSize(Files.size(path));
+            backupFile.setLastModifiedTime(Files.getLastModifiedTime(path).toInstant());
+            return backupFile;
+        } catch (IOException e) {
+            throw Exceptions.propagate(e);
+        }
+    }
+
     private Mono<Void> restoreWorkdir(Path backupRoot) {
         return Mono.<Void>create(sink -> {
             try {
@@ -180,7 +244,7 @@ public class MigrationServiceImpl implements MigrationService {
     private Mono<Void> restoreExtensions(Path backupRoot) {
         var extensionsPath = backupRoot.resolve("extensions.data");
         if (Files.notExists(extensionsPath)) {
-            return Mono.empty();
+            return Mono.error(new ServerWebInputException("Extensions data file not found."));
         }
         var reader = objectMapper.readerFor(ExtensionStore.class);
         return Mono.<Void, MappingIterator<ExtensionStore>>using(
@@ -193,13 +257,9 @@ public class MigrationServiceImpl implements MigrationService {
                             sink.complete();
                         })
                     // reset version
-                    .doOnNext(extensionStore -> extensionStore.setVersion(null)).buffer(100)
-                    // We might encounter OptimisticLockingFailureException when saving extension
-                    // store,
-                    // So we have to delete all extension stores before saving.
-                    .flatMap(extensionStores -> repository.deleteAll(extensionStores)
-                        .thenMany(repository.saveAll(extensionStores))
-                    )
+                    .doOnNext(extensionStore -> extensionStore.setVersion(null))
+                    .buffer(100)
+                    .flatMap(repository::saveAll)
                     .doOnNext(extensionStore -> log.info("Restored extension store: {}",
                         extensionStore.getName()))
                     .then(),
@@ -263,5 +323,10 @@ public class MigrationServiceImpl implements MigrationService {
                     }).then(),
                 FileUtils::closeQuietly))
             .subscribeOn(scheduler);
+    }
+
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        Files.createDirectories(getBackupsRoot());
     }
 }

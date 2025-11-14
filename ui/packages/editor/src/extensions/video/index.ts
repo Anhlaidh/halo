@@ -1,39 +1,40 @@
-import type { ExtensionOptions, NodeBubbleMenu } from "@/types";
-import {
-  Editor,
-  isActive,
-  mergeAttributes,
-  Node,
-  nodeInputRule,
-  type Range,
-  VueNodeViewRenderer,
-} from "@/tiptap/vue-3";
-import type { EditorState } from "@/tiptap/pm";
-import { markRaw } from "vue";
-import VideoView from "./VideoView.vue";
-import MdiVideo from "~icons/mdi/video";
+import { BlockActionSeparator } from "@/components";
+import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
 import ToolboxItem from "@/components/toolbox/ToolboxItem.vue";
 import { i18n } from "@/locales";
-import { BlockActionSeparator } from "@/components";
-import BubbleItemVideoSize from "./BubbleItemVideoSize.vue";
-import BubbleItemVideoLink from "./BubbleItemVideoLink.vue";
-import MdiImageSizeSelectActual from "~icons/mdi/image-size-select-actual";
-import MdiImageSizeSelectSmall from "~icons/mdi/image-size-select-small";
-import MdiImageSizeSelectLarge from "~icons/mdi/image-size-select-large";
-import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
-import MdiFormatAlignCenter from "~icons/mdi/format-align-center";
-import MdiFormatAlignRight from "~icons/mdi/format-align-right";
-import MdiFormatAlignJustify from "~icons/mdi/format-align-justify";
+import {
+  Editor,
+  Node,
+  PluginKey,
+  VueNodeViewRenderer,
+  isActive,
+  mergeAttributes,
+  nodeInputRule,
+  type Range,
+} from "@/tiptap";
+import type { EditorState } from "@/tiptap/pm";
+import type { ExtensionOptions, NodeBubbleMenuType } from "@/types";
+import { deleteNode } from "@/utils";
+import { markRaw } from "vue";
 import MdiCogPlay from "~icons/mdi/cog-play";
 import MdiCogPlayOutline from "~icons/mdi/cog-play-outline";
+import MdiFormatAlignCenter from "~icons/mdi/format-align-center";
+import MdiFormatAlignJustify from "~icons/mdi/format-align-justify";
+import MdiFormatAlignLeft from "~icons/mdi/format-align-left";
+import MdiFormatAlignRight from "~icons/mdi/format-align-right";
+import MdiImageSizeSelectActual from "~icons/mdi/image-size-select-actual";
+import MdiImageSizeSelectLarge from "~icons/mdi/image-size-select-large";
+import MdiImageSizeSelectSmall from "~icons/mdi/image-size-select-small";
+import MdiLinkVariant from "~icons/mdi/link-variant";
+import MdiMotionPlay from "~icons/mdi/motion-play";
+import MdiMotionPlayOutline from "~icons/mdi/motion-play-outline";
 import MdiPlayCircle from "~icons/mdi/play-circle";
 import MdiPlayCircleOutline from "~icons/mdi/play-circle-outline";
-import MdiMotionPlayOutline from "~icons/mdi/motion-play-outline";
-import MdiMotionPlay from "~icons/mdi/motion-play";
-import MdiLinkVariant from "~icons/mdi/link-variant";
 import MdiShare from "~icons/mdi/share";
-import { deleteNode } from "@/utils";
-import MdiDeleteForeverOutline from "@/components/icon/MdiDeleteForeverOutline.vue";
+import MdiVideo from "~icons/mdi/video";
+import BubbleItemVideoLink from "./BubbleItemVideoLink.vue";
+import BubbleItemVideoSize from "./BubbleItemVideoSize.vue";
+import VideoView from "./VideoView.vue";
 declare module "@/tiptap" {
   interface Commands<ReturnType> {
     video: {
@@ -42,8 +43,11 @@ declare module "@/tiptap" {
   }
 }
 
+export const VIDEO_BUBBLE_MENU_KEY = new PluginKey("videoBubbleMenu");
+
 const Video = Node.create<ExtensionOptions>({
   name: "video",
+  fakeSelection: true,
 
   inline() {
     return true;
@@ -214,9 +218,9 @@ const Video = Node.create<ExtensionOptions>({
           },
         ];
       },
-      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenu {
+      getBubbleMenu({ editor }: { editor: Editor }): NodeBubbleMenuType {
         return {
-          pluginKey: "videoBubbleMenu",
+          pluginKey: VIDEO_BUBBLE_MENU_KEY,
           shouldShow: ({ state }: { state: EditorState }) => {
             return isActive(state, Video.name);
           },
@@ -418,31 +422,6 @@ const Video = Node.create<ExtensionOptions>({
               },
             },
           ],
-        };
-      },
-      getDraggable() {
-        return {
-          getRenderContainer({ dom, view }) {
-            let container = dom;
-            while (container && container.tagName !== "P") {
-              container = container.parentElement as HTMLElement;
-            }
-            if (container) {
-              container = container.firstElementChild
-                ?.firstElementChild as HTMLElement;
-            }
-            let node;
-            if (container.firstElementChild) {
-              const pos = view.posAtDOM(container.firstElementChild, 0);
-              const $pos = view.state.doc.resolve(pos);
-              node = $pos.node();
-            }
-
-            return {
-              node: node,
-              el: container,
-            };
-          },
         };
       },
     };

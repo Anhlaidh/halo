@@ -1,14 +1,12 @@
-import type { Editor, Range } from "@/tiptap/vue-3";
-import TiptapTaskList from "@tiptap/extension-task-list";
-import type { TaskListOptions } from "@tiptap/extension-task-list";
-import ExtensionTaskItem from "@tiptap/extension-task-item";
 import ToolbarItem from "@/components/toolbar/ToolbarItem.vue";
-import MdiFormatListCheckbox from "~icons/mdi/format-list-checkbox";
-import { markRaw } from "vue";
 import { i18n } from "@/locales";
+import type { Editor, Range } from "@/tiptap";
 import type { ExtensionOptions } from "@/types";
+import { TaskItem, TaskList as TiptapTaskList } from "@tiptap/extension-list";
+import { markRaw } from "vue";
+import MdiFormatListCheckbox from "~icons/mdi/format-list-checkbox";
 
-const TaskList = TiptapTaskList.extend<ExtensionOptions & TaskListOptions>({
+const TaskList = TiptapTaskList.extend<ExtensionOptions>({
   addOptions() {
     return {
       ...this.parent?.(),
@@ -36,26 +34,10 @@ const TaskList = TiptapTaskList.extend<ExtensionOptions & TaskListOptions>({
           },
         };
       },
-      getDraggable() {
-        return {
-          getRenderContainer({ dom }) {
-            let container = dom;
-            while (container && !(container.tagName === "LI")) {
-              container = container.parentElement as HTMLElement;
-            }
-            return {
-              el: container,
-              dragDomOffset: {
-                y: -1,
-              },
-            };
-          },
-        };
-      },
     };
   },
   addExtensions() {
-    return [ExtensionTaskItem];
+    return [TaskItem];
   },
 });
 

@@ -9,7 +9,7 @@ import {
 } from "@halo-dev/components";
 
 import { usePluginModuleStore } from "@/stores/plugin";
-import type { BackupTab } from "@halo-dev/console-shared";
+import type { BackupTab } from "@halo-dev/ui-shared";
 import { useRouteQuery } from "@vueuse/router";
 import { markRaw, onMounted, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
@@ -63,12 +63,12 @@ onMounted(async () => {
 <template>
   <VPageHeader :title="$t('core.backup.title')">
     <template #icon>
-      <IconServerLine class="mr-2 self-center" />
+      <IconServerLine />
     </template>
     <template #actions>
       <VButton type="secondary" @click="handleCreate">
         <template #icon>
-          <IconAddCircle class="h-full w-full" />
+          <IconAddCircle />
         </template>
         {{ $t("core.backup.operations.create.button") }}
       </VButton>

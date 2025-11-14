@@ -1,28 +1,15 @@
 <script lang="ts" setup>
-import {
-  Editor,
-  type Node,
-  type PMNode,
-  type Decoration,
-} from "@halo-dev/richtext-editor";
+import { IconImageAddLine, VButton } from "@halo-dev/components";
+import { type NodeViewProps } from "@halo-dev/richtext-editor";
+import type { AttachmentSimple } from "@halo-dev/ui-shared";
 import { computed, onMounted, ref } from "vue";
-import Image from "./index";
-import { fileToBase64 } from "../../utils/upload";
-import { VButton, IconImageAddLine } from "@halo-dev/components";
-import { type AttachmentAttr } from "../../utils/attachment";
 import { EditorLinkObtain } from "../../components";
 import InlineBlockBox from "../../components/InlineBlockBox.vue";
+import { useExternalAssetsTransfer } from "../../composables/use-attachment";
+import { fileToBase64 } from "../../utils/upload";
+import Image from "./index";
 
-const props = defineProps<{
-  editor: Editor;
-  node: PMNode;
-  decorations: Decoration[];
-  selected: boolean;
-  extension: Node;
-  getPos: () => number;
-  updateAttributes: (attributes: Record<string, unknown>) => void;
-  deleteNode: () => void;
-}>();
+const props = defineProps<NodeViewProps>();
 
 const src = computed({
   get: () => {
@@ -71,10 +58,11 @@ const handleUploadReady = async (file: File) => {
   retryFlag.value = false;
 };
 
-const handleSetExternalLink = (attachment: AttachmentAttr) => {
+const handleSetExternalLink = (attachment?: AttachmentSimple) => {
+  if (!attachment) return;
   props.updateAttributes({
     src: attachment.url,
-    alt: attachment.name,
+    alt: attachment.alt,
   });
 };
 
@@ -93,7 +81,9 @@ const handleUploadError = () => {
 const resetUpload = () => {
   fileBase64.value = undefined;
   uploadProgress.value = undefined;
-  if (props.getPos()) {
+
+  const { file } = props.node.attrs;
+  if (file) {
     props.updateAttributes({
       width: undefined,
       height: undefined,
@@ -145,7 +135,7 @@ onMounted(() => {
     props.editor
       .chain()
       .updateAttributes(Image.name, { width, height })
-      .setNodeSelection(props.getPos())
+      .setNodeSelection(props.getPos() || 0)
       .focus()
       .run();
   }
@@ -155,6 +145,9 @@ onMounted(() => {
     document.documentElement.removeEventListener("mouseup", stopDrag, false);
   }
 });
+
+const { isExternalAsset, transferring, handleTransfer } =
+  useExternalAssetsTransfer(src, handleSetExternalLink);
 </script>
 
 <template>
@@ -183,8 +176,29 @@ onMounted(() => {
 
         <div
           v-if="src"
-          class="absolute left-0 top-0 hidden h-1/4 w-full cursor-pointer justify-end bg-gradient-to-b from-gray-300 to-transparent p-2 ease-in-out group-hover:flex"
+          class="absolute left-0 top-0 hidden h-1/4 w-full cursor-pointer justify-end gap-2 bg-gradient-to-b from-gray-300 to-transparent p-2 ease-in-out group-hover:flex"
         >
+          <HasPermission :permissions="['uc:attachments:manage']">
+            <VButton
+              v-if="isExternalAsset"
+              v-tooltip="
+                $t(
+                  'core.components.default_editor.extensions.upload.operations.transfer.tooltip'
+                )
+              "
+              :loading="transferring"
+              size="sm"
+              ghost
+              @click="handleTransfer"
+            >
+              {{
+                $t(
+                  "core.components.default_editor.extensions.upload.operations.transfer.button"
+                )
+              }}
+            </VButton>
+          </HasPermission>
+
           <VButton size="sm" type="secondary" @click="handleResetInit">
             {{
               $t(

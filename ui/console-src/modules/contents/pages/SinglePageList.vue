@@ -1,4 +1,8 @@
 <script lang="ts" setup>
+import UserFilterDropdown from "@/components/filter/UserFilterDropdown.vue";
+import { singlePageLabels } from "@/constants/labels";
+import type { ListedSinglePage, SinglePage } from "@halo-dev/api-client";
+import { consoleApiClient, coreApiClient } from "@halo-dev/api-client";
 import {
   Dialog,
   IconAddCircle,
@@ -10,22 +14,19 @@ import {
   VButton,
   VCard,
   VEmpty,
+  VEntityContainer,
   VLoading,
   VPageHeader,
   VPagination,
   VSpace,
 } from "@halo-dev/components";
-import SinglePageSettingModal from "./components/SinglePageSettingModal.vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useRouteQuery } from "@vueuse/router";
 import type { Ref } from "vue";
 import { computed, provide, ref, watch } from "vue";
-import type { ListedSinglePage, SinglePage } from "@halo-dev/api-client";
-import { apiClient } from "@/utils/api-client";
-import { singlePageLabels } from "@/constants/labels";
-import { useQuery } from "@tanstack/vue-query";
 import { useI18n } from "vue-i18n";
-import UserFilterDropdown from "@/components/filter/UserFilterDropdown.vue";
 import SinglePageListItem from "./components/SinglePageListItem.vue";
-import { useRouteQuery } from "@vueuse/router";
+import SinglePageSettingModal from "./components/SinglePageSettingModal.vue";
 
 const { t } = useI18n();
 
@@ -114,7 +115,7 @@ const {
       );
     }
 
-    const { data } = await apiClient.singlePage.listSinglePages({
+    const { data } = await consoleApiClient.content.singlePage.listSinglePages({
       labelSelector,
       page: page.value,
       size: size.value,
@@ -143,10 +144,9 @@ const {
 });
 
 const handleOpenSettingModal = async (singlePage: SinglePage) => {
-  const { data } =
-    await apiClient.extension.singlePage.getContentHaloRunV1alpha1SinglePage({
-      name: singlePage.metadata.name,
-    });
+  const { data } = await coreApiClient.content.singlePage.getSinglePage({
+    name: singlePage.metadata.name,
+  });
   selectedSinglePage.value = data;
   settingModal.value = true;
 };
@@ -165,10 +165,9 @@ const handleSelectPrevious = async () => {
       singlePage.page.metadata.name === selectedSinglePage.value?.metadata.name
   );
   if (index > 0) {
-    const { data } =
-      await apiClient.extension.singlePage.getContentHaloRunV1alpha1SinglePage({
-        name: singlePages.value[index - 1].page.metadata.name,
-      });
+    const { data } = await coreApiClient.content.singlePage.getSinglePage({
+      name: singlePages.value[index - 1].page.metadata.name,
+    });
     selectedSinglePage.value = data;
     return;
   }
@@ -188,10 +187,9 @@ const handleSelectNext = async () => {
       singlePage.page.metadata.name === selectedSinglePage.value?.metadata.name
   );
   if (index < singlePages.value.length - 1) {
-    const { data } =
-      await apiClient.extension.singlePage.getContentHaloRunV1alpha1SinglePage({
-        name: singlePages.value[index + 1].page.metadata.name,
-      });
+    const { data } = await coreApiClient.content.singlePage.getSinglePage({
+      name: singlePages.value[index + 1].page.metadata.name,
+    });
     selectedSinglePage.value = data;
     return;
   }
@@ -240,18 +238,16 @@ const handleDeleteInBatch = async () => {
             return Promise.resolve();
           }
 
-          return apiClient.extension.singlePage.updateContentHaloRunV1alpha1SinglePage(
-            {
-              name: page.metadata.name,
-              singlePage: {
-                ...page,
-                spec: {
-                  ...page.spec,
-                  deleted: true,
-                },
+          return coreApiClient.content.singlePage.patchSinglePage({
+            name: page.metadata.name,
+            jsonPatchInner: [
+              {
+                op: "add",
+                path: "/spec/deleted",
+                value: true,
               },
-            }
-          );
+            ],
+          });
         })
       );
       await refetch();
@@ -285,28 +281,26 @@ watch(selectedPageNames, (newValue) => {
 
   <VPageHeader :title="$t('core.page.title')">
     <template #icon>
-      <IconPages class="mr-2 self-center" />
+      <IconPages />
     </template>
     <template #actions>
-      <VSpace>
-        <VButton
-          v-permission="['system:singlepages:view']"
-          :route="{ name: 'DeletedSinglePages' }"
-          size="sm"
-        >
-          {{ $t("core.page.actions.recycle_bin") }}
-        </VButton>
-        <VButton
-          v-permission="['system:singlepages:manage']"
-          :route="{ name: 'SinglePageEditor' }"
-          type="secondary"
-        >
-          <template #icon>
-            <IconAddCircle class="h-full w-full" />
-          </template>
-          {{ $t("core.common.buttons.new") }}
-        </VButton>
-      </VSpace>
+      <VButton
+        v-permission="['system:singlepages:view']"
+        :route="{ name: 'DeletedSinglePages' }"
+        size="sm"
+      >
+        {{ $t("core.page.actions.recycle_bin") }}
+      </VButton>
+      <VButton
+        v-permission="['system:singlepages:manage']"
+        :route="{ name: 'SinglePageEditor' }"
+        type="secondary"
+      >
+        <template #icon>
+          <IconAddCircle />
+        </template>
+        {{ $t("core.common.buttons.new") }}
+      </VButton>
     </template>
   </VPageHeader>
 
@@ -437,10 +431,10 @@ watch(selectedPageNames, (newValue) => {
               <VButton
                 v-permission="['system:singlepages:manage']"
                 :route="{ name: 'SinglePageEditor' }"
-                type="primary"
+                type="secondary"
               >
                 <template #icon>
-                  <IconAddCircle class="h-full w-full" />
+                  <IconAddCircle />
                 </template>
                 {{ $t("core.common.buttons.new") }}
               </VButton>
@@ -449,21 +443,15 @@ watch(selectedPageNames, (newValue) => {
         </VEmpty>
       </Transition>
       <Transition v-else appear name="fade">
-        <ul
-          class="box-border h-full w-full divide-y divide-gray-100"
-          role="list"
-        >
-          <li
+        <VEntityContainer>
+          <SinglePageListItem
             v-for="singlePage in singlePages"
             :key="singlePage.page.metadata.name"
-          >
-            <SinglePageListItem
-              :single-page="singlePage"
-              :is-selected="checkSelection(singlePage.page)"
-              @open-setting-modal="handleOpenSettingModal"
-            />
-          </li>
-        </ul>
+            :single-page="singlePage"
+            :is-selected="checkSelection(singlePage.page)"
+            @open-setting-modal="handleOpenSettingModal"
+          />
+        </VEntityContainer>
       </Transition>
 
       <template #footer>

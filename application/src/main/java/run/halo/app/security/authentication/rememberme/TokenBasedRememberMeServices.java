@@ -1,8 +1,5 @@
 package run.halo.app.security.authentication.rememberme;
 
-import static org.apache.commons.lang3.BooleanUtils.isTrue;
-import static org.apache.commons.lang3.BooleanUtils.toBoolean;
-
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +28,8 @@ import org.springframework.security.crypto.codec.Utf8;
 import org.springframework.security.web.authentication.rememberme.CookieTheftException;
 import org.springframework.security.web.authentication.rememberme.InvalidCookieException;
 import org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationException;
-import org.springframework.stereotype.Component;
+import org.springframework.security.web.server.WebFilterExchange;
+import org.springframework.security.web.server.authentication.logout.ServerLogoutHandler;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -54,27 +52,24 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Setter
 @Getter
-@Component
 @RequiredArgsConstructor
-public class TokenBasedRememberMeServices implements RememberMeServices {
-
-    public static final int TWO_WEEKS_S = 1209600;
-
-    public static final String DEFAULT_PARAMETER = "remember-me";
+public class TokenBasedRememberMeServices implements ServerLogoutHandler, RememberMeServices {
 
     public static final String DEFAULT_ALGORITHM = "SHA-256";
 
     private static final String DELIMITER = ":";
 
-    private final CookieSignatureKeyResolver cookieSignatureKeyResolver;
+    protected final CookieSignatureKeyResolver cookieSignatureKeyResolver;
 
     private final ReactiveUserDetailsService userDetailsService;
 
-    private final RememberMeCookieResolver rememberMeCookieResolver;
+    protected final RememberMeCookieResolver rememberMeCookieResolver;
 
     private UserDetailsChecker userDetailsChecker = new AccountStatusUserDetailsChecker();
 
     private GrantedAuthoritiesMapper authoritiesMapper = new NullAuthoritiesMapper();
+
+    private RememberMeRequestCache rememberMeRequestCache = new WebSessionRememberMeRequestCache();
 
     private static boolean equals(String expected, String actual) {
         byte[] expectedBytes = bytesUtf8(expected);
@@ -208,16 +203,22 @@ public class TokenBasedRememberMeServices implements RememberMeServices {
     public Mono<Void> loginFail(ServerWebExchange exchange) {
         log.debug("Interactive login attempt was unsuccessful.");
         cancelCookie(exchange);
-        return Mono.empty();
+        return rememberMeRequestCache.saveRememberMe(exchange);
     }
 
     @Override
     public Mono<Void> loginSuccess(ServerWebExchange exchange,
         Authentication successfulAuthentication) {
-        if (!rememberMeRequested(exchange)) {
-            log.debug("Remember-me login not requested.");
-            return Mono.empty();
-        }
+        return rememberMeRequestCache.isRememberMe(exchange)
+            .filter(Boolean::booleanValue)
+            .switchIfEmpty(Mono.fromRunnable(() -> {
+                log.debug("Remember-me login not requested.");
+            }))
+            .flatMap(rememberMe -> onLoginSuccess(exchange, successfulAuthentication));
+    }
+
+    protected Mono<Void> onLoginSuccess(ServerWebExchange exchange,
+        Authentication successfulAuthentication) {
         return Mono.defer(() -> retrieveUsernamePassword(successfulAuthentication))
             .flatMap(pair -> {
                 var username = pair.username();
@@ -275,18 +276,6 @@ public class TokenBasedRememberMeServices implements RememberMeServices {
         Authentication authentication) {
         var tokenLifetime = rememberMeCookieResolver.getCookieMaxAge().toSeconds();
         return Instant.now().plusSeconds(tokenLifetime).toEpochMilli();
-    }
-
-    protected boolean rememberMeRequested(ServerWebExchange exchange) {
-        String rememberMe = exchange.getRequest().getQueryParams().getFirst(DEFAULT_PARAMETER);
-        if (isTrue(toBoolean(rememberMe))) {
-            return true;
-        }
-        if (log.isDebugEnabled()) {
-            log.debug("Did not send remember-me cookie (principal did not set parameter '{}')",
-                DEFAULT_PARAMETER);
-        }
-        return false;
     }
 
     protected String[] decodeCookie(String cookieValue) throws InvalidCookieException {
@@ -370,6 +359,19 @@ public class TokenBasedRememberMeServices implements RememberMeServices {
 
     protected Mono<String> getKey() {
         return cookieSignatureKeyResolver.resolveSigningKey();
+    }
+
+    @Override
+    public Mono<Void> logout(WebFilterExchange exchange, Authentication authentication) {
+        if (log.isDebugEnabled()) {
+            log.debug("Logout of user {}", (authentication != null) ? authentication.getName()
+                : "Unknown");
+        }
+        return loginFail(exchange.getExchange()).then(onLogout(exchange, authentication));
+    }
+
+    protected Mono<Void> onLogout(WebFilterExchange exchange, Authentication authentication) {
+        return Mono.empty();
     }
 
     record UsernamePassword(String username, String password) {

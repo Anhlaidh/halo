@@ -1,20 +1,10 @@
-import { apiClient } from "@/utils/api-client";
-import type { Category } from "@halo-dev/api-client";
-import type { Ref } from "vue";
-import { ref } from "vue";
-import type { CategoryTree } from "../utils";
-import { buildCategoriesTree } from "../utils";
+import { coreApiClient } from "@halo-dev/api-client";
 import { useQuery } from "@tanstack/vue-query";
+import { ref } from "vue";
+import { buildCategoriesTree, type CategoryTreeNode } from "../utils";
 
-interface usePostCategoryReturn {
-  categories: Ref<Category[] | undefined>;
-  categoriesTree: Ref<CategoryTree[]>;
-  isLoading: Ref<boolean>;
-  handleFetchCategories: () => void;
-}
-
-export function usePostCategory(): usePostCategoryReturn {
-  const categoriesTree = ref<CategoryTree[]>([] as CategoryTree[]);
+export function usePostCategory() {
+  const categoriesTree = ref<CategoryTreeNode[]>([] as CategoryTreeNode[]);
 
   const {
     data: categories,
@@ -23,12 +13,11 @@ export function usePostCategory(): usePostCategoryReturn {
   } = useQuery({
     queryKey: ["post-categories"],
     queryFn: async () => {
-      const { data } =
-        await apiClient.extension.category.listContentHaloRunV1alpha1Category({
-          page: 0,
-          size: 0,
-          sort: ["metadata.creationTimestamp,desc"],
-        });
+      const { data } = await coreApiClient.content.category.listCategory({
+        page: 0,
+        size: 0,
+        sort: ["metadata.creationTimestamp,desc"],
+      });
 
       return data.items;
     },

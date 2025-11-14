@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -25,7 +25,6 @@ import run.halo.app.extension.ExtensionStoreUtil;
 import run.halo.app.extension.PageRequestImpl;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.extension.SchemeManager;
-import run.halo.app.extension.index.IndexerFactory;
 import run.halo.app.extension.store.ReactiveExtensionStoreClient;
 import run.halo.app.infra.utils.JsonUtils;
 
@@ -56,24 +55,18 @@ class ReplyServiceImplIntegrationTest {
         @Autowired
         private SchemeManager schemeManager;
 
-        @SpyBean
+        @MockitoSpyBean
         private ReactiveExtensionClient reactiveClient;
 
         @Autowired
         private ReactiveExtensionStoreClient storeClient;
 
-        @Autowired
-        private IndexerFactory indexerFactory;
-
-        @SpyBean
+        @MockitoSpyBean
         private ReplyServiceImpl replyService;
 
         Mono<Extension> deleteImmediately(Extension extension) {
             var name = extension.getMetadata().getName();
             var scheme = schemeManager.get(extension.getClass());
-            // un-index
-            var indexer = indexerFactory.getIndexer(extension.groupVersionKind());
-            indexer.unIndexRecord(extension.getMetadata().getName());
 
             // delete from db
             var storeName = ExtensionStoreUtil.buildStoreName(scheme, name);

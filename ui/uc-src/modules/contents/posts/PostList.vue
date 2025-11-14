@@ -1,6 +1,6 @@
 <script lang="ts" setup>
-import { apiClient } from "@/utils/api-client";
-import { useQuery } from "@tanstack/vue-query";
+import { postLabels } from "@/constants/labels";
+import { ucApiClient } from "@halo-dev/api-client";
 import {
   IconAddCircle,
   IconBookRead,
@@ -8,15 +8,16 @@ import {
   VButton,
   VCard,
   VEmpty,
+  VEntityContainer,
   VLoading,
   VPageHeader,
   VPagination,
   VSpace,
 } from "@halo-dev/components";
-import PostListItem from "./components/PostListItem.vue";
+import { useQuery } from "@tanstack/vue-query";
 import { useRouteQuery } from "@vueuse/router";
 import { computed, watch } from "vue";
-import { postLabels } from "@/constants/labels";
+import PostListItem from "./components/PostListItem.vue";
 
 const page = useRouteQuery<number>("page", 1, {
   transform: Number,
@@ -54,7 +55,7 @@ const {
   queryKey: ["my-posts", page, size, keyword, selectedPublishPhase],
   queryFn: async () => {
     const labelSelector: string[] = ["content.halo.run/deleted=false"];
-    const { data } = await apiClient.uc.post.listMyPosts({
+    const { data } = await ucApiClient.content.post.listMyPosts({
       labelSelector,
       page: page.value,
       size: size.value,
@@ -103,12 +104,12 @@ const {
 <template>
   <VPageHeader :title="$t('core.uc_post.title')">
     <template #icon>
-      <IconBookRead class="mr-2 self-center" />
+      <IconBookRead />
     </template>
     <template #actions>
       <VButton :route="{ name: 'PostEditor' }" type="secondary">
         <template #icon>
-          <IconAddCircle class="h-full w-full" />
+          <IconAddCircle />
         </template>
         {{ $t("core.common.buttons.new") }}
       </VButton>
@@ -175,10 +176,10 @@ const {
               <VButton
                 v-permission="['system:posts:manage']"
                 :route="{ name: 'PostEditor' }"
-                type="primary"
+                type="secondary"
               >
                 <template #icon>
-                  <IconAddCircle class="h-full w-full" />
+                  <IconAddCircle />
                 </template>
                 {{ $t("core.common.buttons.new") }}
               </VButton>
@@ -187,14 +188,13 @@ const {
         </VEmpty>
       </Transition>
       <Transition v-else appear name="fade">
-        <ul
-          class="box-border h-full w-full divide-y divide-gray-100"
-          role="list"
-        >
-          <li v-for="post in posts.items" :key="post.post.metadata.name">
-            <PostListItem :post="post" />
-          </li>
-        </ul>
+        <VEntityContainer>
+          <PostListItem
+            v-for="post in posts.items"
+            :key="post.post.metadata.name"
+            :post="post"
+          />
+        </VEntityContainer>
       </Transition>
 
       <template #footer>

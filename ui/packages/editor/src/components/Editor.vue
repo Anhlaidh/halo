@@ -1,13 +1,14 @@
 <script lang="ts" setup>
-import { Editor, EditorContent } from "@/tiptap/vue-3";
-import EditorHeader from "./EditorHeader.vue";
-import EditorBubbleMenu from "./EditorBubbleMenu.vue";
-import { watch, type CSSProperties, type PropType } from "vue";
 import { i18n } from "@/locales";
+import { EditorContent, VueEditor } from "@/tiptap";
+import { watch, type CSSProperties, type PropType } from "vue";
+import EditorBubbleMenu from "./EditorBubbleMenu.vue";
+import EditorHeader from "./EditorHeader.vue";
+import EditorDragHandle from "./drag/EditorDragHandle.vue";
 
 const props = defineProps({
   editor: {
-    type: Object as PropType<Editor>,
+    type: Object as PropType<VueEditor>,
     required: true,
   },
   contentStyles: {
@@ -35,9 +36,10 @@ watch(
 <template>
   <div v-if="editor" class="halo-rich-text-editor">
     <editor-bubble-menu :editor="editor" />
+    <editor-drag-handle :editor="editor" />
     <editor-header :editor="editor" />
-    <div class="h-full flex flex-row w-full overflow-hidden">
-      <div class="overflow-y-auto flex-1 bg-white relative">
+    <div class="flex h-full w-full flex-row overflow-hidden">
+      <div class="relative flex-1 overflow-y-auto bg-white">
         <div v-if="$slots.content" class="editor-header-extra">
           <slot name="content" />
         </div>
@@ -50,7 +52,7 @@ watch(
       </div>
       <div
         v-if="$slots.extra"
-        class="h-full hidden sm:!block w-72 flex-shrink-0 flex-none"
+        class="hidden h-full w-72 flex-none flex-shrink-0 sm:!block"
       >
         <slot name="extra"></slot>
       </div>

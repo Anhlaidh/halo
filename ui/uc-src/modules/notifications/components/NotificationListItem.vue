@@ -1,12 +1,11 @@
 <script lang="ts" setup>
-import { useUserStore } from "@/stores/user";
-import { apiClient } from "@/utils/api-client";
-import { relativeTimeTo } from "@/utils/date";
 import type { Notification } from "@halo-dev/api-client";
-import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { ucApiClient } from "@halo-dev/api-client";
 import { Dialog, Toast, VStatusDot } from "@halo-dev/components";
-import { watch } from "vue";
-import { ref } from "vue";
+import { stores, utils } from "@halo-dev/ui-shared";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import sanitize from "sanitize-html";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 const queryClient = useQueryClient();
@@ -20,17 +19,18 @@ const props = withDefaults(
   {}
 );
 
-const { currentUser } = useUserStore();
+const { currentUser } = stores.currentUser();
 
 const isRead = ref();
 
 const { mutate: handleMarkAsRead } = useMutation({
   mutationKey: ["notification-mark-as-read"],
   mutationFn: async ({ refetch }: { refetch: boolean }) => {
-    const { data } = await apiClient.notification.markNotificationAsRead({
-      name: props.notification.metadata.name,
-      username: currentUser?.metadata.name as string,
-    });
+    const { data } =
+      await ucApiClient.notification.notification.markNotificationAsRead({
+        name: props.notification.metadata.name,
+        username: currentUser?.user.metadata.name as string,
+      });
 
     if (refetch) {
       await queryClient.invalidateQueries({ queryKey: ["user-notifications"] });
@@ -47,10 +47,13 @@ function handleDelete() {
   Dialog.warning({
     title: t("core.uc_notification.operations.delete.title"),
     description: t("core.uc_notification.operations.delete.description"),
+    confirmText: t("core.common.buttons.confirm"),
+    cancelText: t("core.common.buttons.cancel"),
+    confirmType: "danger",
     async onConfirm() {
-      await apiClient.notification.deleteSpecifiedNotification({
+      await ucApiClient.notification.notification.deleteSpecifiedNotification({
         name: props.notification.metadata.name,
-        username: currentUser?.metadata.name as string,
+        username: currentUser?.user.metadata.name as string,
       });
 
       await queryClient.invalidateQueries({ queryKey: ["user-notifications"] });
@@ -71,6 +74,14 @@ watch(
     immediate: true,
   }
 );
+
+const content = computed(() => {
+  // Clean html tags
+  return sanitize(props.notification.spec?.htmlContent || "", {
+    allowedTags: [],
+    allowedAttributes: {},
+  });
+});
 </script>
 <template>
   <div
@@ -96,14 +107,14 @@ watch(
       />
     </div>
     <div
-      v-if="notification.spec?.rawContent"
-      class="truncate text-xs text-gray-600"
+      v-if="notification.spec?.htmlContent"
+      class="line-clamp-1 text-xs text-gray-600"
     >
-      {{ notification.spec.rawContent }}
+      {{ content }}
     </div>
     <div class="flex h-6 items-end justify-between">
       <div class="text-xs text-gray-600">
-        {{ relativeTimeTo(notification.metadata.creationTimestamp) }}
+        {{ utils.date.timeAgo(notification.metadata.creationTimestamp) }}
       </div>
       <div class="hidden space-x-2 group-hover:block">
         <span

@@ -1,73 +1,4 @@
 core:
-  login:
-    title: Login
-    fields:
-      username:
-        placeholder: Username
-      password:
-        placeholder: Password
-      remember_me:
-        label: Remember Me
-    operations:
-      submit:
-        toast_success: Login successful
-        toast_failed: Login failed, incorrect username or password
-        toast_csrf: CSRF Token expired, please try again
-      signup:
-        label: No account
-        button: Sign up
-      return_login:
-        label: Already have an account
-        button: Sign in
-      return_site: Return to site
-      reset_password:
-        button: Retrieve password
-    button: Login
-    modal:
-      title: Re-login
-  signup:
-    title: Sign up
-    fields:
-      username:
-        placeholder: Username
-      display_name:
-        placeholder: Display name
-      email:
-        placeholder: Email
-        matchFailed: The email format is wrong or the service provider is not supported.
-      verify_code:
-        placeholder: Verification code
-        operations:
-          send_code:
-            buttons:
-              sending: sending
-              send: Send Code
-              countdown: resend after {timer} seconds
-            toast_success: verification code sent
-            toast_email_empty: please enter your email address
-      password:
-        placeholder: Password
-      password_confirm:
-        placeholder: Confirm password
-    operations:
-      submit:
-        button: Sign up
-        toast_success: Sign up successfully
-  binding:
-    title: Account binding
-    common:
-      toast:
-        mounted: >-
-          The current login method is not bound to an account, Please bind or
-          sign up a new account first
-    operations:
-      login_and_bind:
-        button: Login and Bind
-      signup_and_bind:
-        button: Signup and Bind
-      bind:
-        toast_success: Binding successfully
-        toast_failed: Binding failed, no enabled login method found
   sidebar:
     search:
       placeholder: Search
@@ -78,6 +9,7 @@ core:
         system: System
         tool: Tool
       items:
+        home: Home
         dashboard: Dashboard
         posts: Posts
         single_pages: Pages
@@ -95,10 +27,15 @@ core:
       logout:
         tooltip: Logout
         title: Logout
+        description: >-
+          Clicking Confirm will redirect to the logout page. Please ensure that
+          the content you are editing is saved.
       profile:
         tooltip: Profile
       visit_homepage:
         title: Visit homepage
+    profile:
+      aggregate_role: Aggregate Role
   uc_sidebar:
     menu:
       items:
@@ -108,14 +45,17 @@ core:
     operations:
       console:
         tooltip: Console
+    profile:
+      aggregate_role: Aggregate Role
   dashboard:
     title: Dashboard
     actions:
       setting: Setting
-      done: Done
-      add_widget: Add Widget
     widgets:
-      modal_title: Widgets
+      common_form:
+        fields:
+          enable_animation:
+            label: Enable animation
       groups:
         post: Post
         page: Page
@@ -131,13 +71,15 @@ core:
           title: Recent Posts
           visits: "{visits} Visits"
           comments: "{comments} Comments"
-          publishTime: Publish Time {publishTime}
+          empty:
+            title: No published posts
+          comments-with-pending: " ({count} pending comments)"
         notification:
           title: Notifications
           empty:
             title: No unread notifications
-        quicklink:
-          title: Quick Link
+        quickaction:
+          title: Quick Action
           actions:
             user_center:
               title: User Center
@@ -162,17 +104,70 @@ core:
                 This operation will recreate search engine indexes for all
                 published posts.
               success_message: Refresh search engine index successfully.
-            evict_page_cache:
-              title: Refresh Page Cache
-              dialog_title: Refresh the page cache
-              dialog_content: This operation will clear the cache for all pages.
-              success_message: Refresh page cache successfully.
+          config:
+            fields:
+              enabled_items:
+                label: Enabled Items
         user_stats:
           title: Users
         comment_stats:
           title: Comments
+        pending_comments:
+          title: Pending Comments
+          empty:
+            title: No pending comments
         views_stats:
           title: Visits
+        iframe:
+          title: Iframe
+          empty:
+            title: Please enter the URL in the configuration
+          config:
+            fields:
+              title:
+                label: Title
+        stack:
+          title: Widget Stack
+          operations:
+            add_widget:
+              button: Add Widget
+          config_modal:
+            title: Widget Stack Config
+            fields:
+              auto_play:
+                label: Auto play
+              auto_play_interval:
+                label: Auto play interval
+              widgets:
+                label: Widgets
+            toast:
+              nest_warning: You cannot add a stack widget to a stack widget
+  dashboard_designer:
+    title: Edit Dashboard
+    actions:
+      add_widget: Add Widget
+    widgets_modal:
+      title: Widgets
+    config_modal:
+      title: Widget Config
+    breakpoints:
+      lg: Desktop
+      md: Tablet (Horizontal)
+      sm: Tablet
+      xs: Mobile
+    operations:
+      back:
+        title: Layout not saved
+        description: >-
+          The current layout has not been saved, if you leave, the current
+          layout will be lost, do you want to continue?
+        confirm_text: Leave
+      change_breakpoint:
+        tips_not_saved: Please save the current layout first
+      copy_from_layout:
+        button: Copy from layout
+      open_widgets_hub:
+        button: Widgets Hub
   post:
     title: Posts
     actions:
@@ -193,6 +188,18 @@ core:
         description: >-
           This operation will move the posts to the recycle bin, and it can be
           restored from the recycle bin later.
+      publish_in_batch:
+        title: Publish posts
+        description: >-
+          Batch publish posts, the selected posts will be set to published
+          status
+      cancel_publish_in_batch:
+        title: Cancel publish posts
+        description: >-
+          Batch cancel publish posts, the selected posts will be set to
+          unpublished status
+      batch_setting:
+        button: Batch settings
     filters:
       status:
         items:
@@ -232,6 +239,7 @@ core:
         pinned: Pinned
         schedule_publish:
           tooltip: Schedule publish
+        comments-with-pending: " ({count} pending comments)"
     settings:
       title: Settings
       groups:
@@ -267,6 +275,8 @@ core:
           label: Template
         cover:
           label: Cover
+        owner:
+          label: Owner
     tag:
       filters:
         sort:
@@ -275,6 +285,28 @@ core:
             create_time_asc: Earliest Created
             display_name_desc: Descending order by tag name
             display_name_asc: Ascending order by tag name
+            post_desc: Most Posts
+    batch_setting_modal:
+      title: Post batch settings
+      fields:
+        common:
+          enabled: Enabled
+          op:
+            label: Operate
+            options:
+              add: Add
+              replace: Replace
+              remove_all: Remove all
+        category_group: Category
+        category_names: Select categories
+        tag_group: Tag
+        tag_names: Select tags
+        visible_group: Visible
+        visible_value: "Select visible option "
+        allow_comment_group: " Allow comment"
+        allow_comment_value: Choose whether to allow comments
+        owner_group: Owner
+        owner_value: Select owner
   deleted_post:
     title: Deleted Posts
     empty:
@@ -366,12 +398,44 @@ core:
           refresh_message: Regenerate slug based on display name.
         template:
           label: Custom template
+          help: >-
+            Customize the rendering template of the category archive page, which
+            requires support from the theme
         cover:
           label: Cover
           help: Theme adaptation is required to support
         description:
           label: Description
-          help: Theme adaptation is required to support
+          help: >-
+            The description will be automatically added to the page's meta
+            description tag for SEO; other display purposes require theme
+            adaptation
+        prevent_parent_post_cascade_query:
+          label: Prevent Parent Post Cascade Query
+          help: >-
+            Prevent parent category from including this category and its
+            subcategories in cascade post queries
+        post_template:
+          label: Custom post template
+          help: >-
+            Customize the rendering template of posts in the current category,
+            which requires support from the theme
+        hide_from_list:
+          label: Hide from list
+          help: >-
+            After turning on this option, this category and its subcategories,
+            as well as its posts, will not be displayed in the front-end list.
+            You need to actively visit the category archive page. This feature
+            is only effective for the first-level directory.
+    list:
+      fields:
+        prevent_parent_post_cascade_query: >-
+          Prevent parent category from including this category and its
+          subcategories in cascade post queries
+        hide_from_list: >-
+          This category is hidden, This category and its subcategories, as well
+          as its posts, will not be displayed in the front-end list. You need to
+          actively visit the category archive page
   page:
     title: Pages
     actions:
@@ -414,6 +478,7 @@ core:
       fields:
         visits: "{visits} Visits"
         comments: "{comments} Comments"
+        comments-with-pending: " ({count} pending comments)"
     settings:
       title: Settings
       groups:
@@ -475,6 +540,9 @@ core:
       title: There are no replies currently.
       message: You can try refreshing or creating a new reply.
       new: New Reply
+    text:
+      commented_on: commented on
+      replied_below: "replied:"
     operations:
       delete_comment:
         title: Delete comment
@@ -496,10 +564,16 @@ core:
           review?
       delete_reply:
         title: Delete reply
-      approve_reply:
-        button: Approve
+      review:
+        button: Review
       reply:
         button: Reply
+      approve:
+        button: Approve
+      reply_and_approve:
+        button: Reply and approve
+      cancel_approve:
+        button: Cancel approve
     filters:
       status:
         items:
@@ -521,6 +595,7 @@ core:
         reply_count: "{count} Replies"
         has_new_replies: New replies
         pending_review: Pending review
+        private: Private
     subject_refs:
       post: Post
       page: Page
@@ -533,6 +608,22 @@ core:
       operations:
         submit:
           toast_success: Reply successfully
+    detail_modal:
+      fields:
+        owner: Commentator
+        creation_time: Comment time
+        commented_on: Commented on
+        new_reply: New reply
+        user_agent: User agent
+    comment_detail_modal:
+      title: Comment detail
+      fields:
+        content: Comment content
+    reply_detail_modal:
+      title: Reply detail
+      fields:
+        original_comment: Original comment
+        content: Reply content
   attachment:
     title: Attachments
     common:
@@ -595,11 +686,17 @@ core:
         owner: Owner
         creation_time: Creation time
         permalink: Permalink
+        thumbnails: Thumbnails
+      display_name_form:
+        help: Custom attachment name, only for display in the management interface, does not affect the file name and access link itself
       preview:
-        click_to_exit: Click to exit preview
         video_not_support: The current browser does not support video playback.
         audio_not_support: The current browser does not support audio playback.
         not_support: This file does not support preview.
+        not_support_thumbnail: This image does not support generating thumbnails.
+    permalink_list:
+      relative: Relative path
+      absolute: Absolute path
     group_editing_modal:
       titles:
         create: Create attachment group
@@ -607,6 +704,8 @@ core:
       fields:
         display_name:
           label: Display name
+      toast:
+        group_name_exists: Group name already exists
     group_list:
       internal_groups:
         all: All
@@ -652,6 +751,20 @@ core:
       fields:
         display_name:
           label: Display name
+        config:
+          label: Policy configuration
+        hidden:
+          label: Hide on upload screen
+          help: >-
+            If enabled, this storage policy will not be visible on the upload
+            screen
+        priority:
+          label: Display priority on upload screen
+          help: >-
+            Set the display priority on the upload screen. The higher the
+            number, the closer it appears to the top of the list
+      toast:
+        policy_name_exists: Storage policy name already exists
     upload_modal:
       title: Upload attachment
       filters:
@@ -663,6 +776,61 @@ core:
             title: No storage policy
             description: Before uploading, a new storage policy needs to be created.
           not_select: Please select a storage policy first.
+      upload_options:
+        local_upload: Upload
+        download: Download from url
+      download_form:
+        fields:
+          url:
+            label: URL
+        toast:
+          success: Downloaded successfully
+    select_modal:
+      title: Select attachment
+      providers:
+        default:
+          label: Attachments
+      operations:
+        select:
+          result: ({count} items selected)
+  uc_attachment:
+    empty:
+      title: There are no attachments.
+      message: >-
+        There are no attachments, you can try refreshing or uploading
+        attachments.
+      actions:
+        upload: Upload Attachment
+    filters:
+      sort:
+        items:
+          create_time_desc: Latest uploaded
+          create_time_asc: Earliest uploaded
+          size_desc: Descending order by file size
+          size_asc: Ascending order by file size
+          display_name_asc: Ascending order by display name
+          display_name_desc: Descending order by display name
+      view_type:
+        items:
+          grid: Grid Mode
+          list: List Mode
+    detail_modal:
+      title: "Attachment: {display_name}"
+      fields:
+        preview: Preview
+        display_name: Display name
+        media_type: Media type
+        size: Size
+        owner: Owner
+        creation_time: Creation time
+        permalink: Permalink
+      preview:
+        click_to_exit: Click to exit preview
+        video_not_support: The current browser does not support video playback.
+        audio_not_support: The current browser does not support audio playback.
+        not_support: This file does not support preview.
+    upload_modal:
+      title: Upload attachment
     select_modal:
       title: Select attachment
       providers:
@@ -721,6 +889,18 @@ core:
         description: >-
           This feature allows you to refresh the cache to view the latest web
           results after modifying template files at runtime.
+      export_configuration:
+        button: Export theme configuration
+      import_configuration:
+        button: Import theme configuration
+        version_mismatch:
+          title: Version mismatch
+          description: >-
+            The imported configuration file version does not match the  current
+            theme version, which may lead to compatibility issues. Do you want
+            to continue importing?
+        invalid_format: Invalid theme configuration file
+        mismatched_theme: Configuration file does not match the selected theme
     list_modal:
       tabs:
         installed: Installed
@@ -829,6 +1009,9 @@ core:
     title: Plugins
     tabs:
       detail: Detail
+    list:
+      fields:
+        system_reserved: System Reserved
     empty:
       title: There are no installed plugins currently.
       message: >-
@@ -864,6 +1047,8 @@ core:
       remote_download:
         title: Remote download address detected, do you want to download?
         description: "Please carefully verify whether this address can be trusted: {url}"
+      reload_window:
+        button: Reload required
     filters:
       status:
         items:
@@ -908,6 +1093,7 @@ core:
         repo: Source Repository
         load_location: Storage Location
         issues: Issues feedback
+        creation_time: Installation Time
       operations:
         view_conditions:
           button: View recent conditions
@@ -927,6 +1113,18 @@ core:
         reason: Reason
         message: Message
         last_transition_time: Last transition time
+    extension-settings:
+      title: Extension settings
+      extension-point-definition:
+        title: Extension point definitions
+      extension-definition:
+        empty:
+          title: There is currently no extension point implemented
+        operation:
+          use:
+            button: Use
+    actions:
+      extension-point-settings: Extension settings
   user:
     title: Users
     actions:
@@ -948,6 +1146,26 @@ core:
         title: Change password
       grant_permission:
         title: Grant permission
+      enable:
+        title: Enable
+        description: >-
+          Are you sure you want to enable this user? Once enabled, the user will
+          be able to log back into the system.
+      enable_in_batch:
+        title: Enable
+        description: >-
+          Are you sure you want to enable the selected users? Once enabled,
+          these users will be able to log back into the system.
+      disable:
+        title: Disable
+        description: >-
+          Are you sure you want to disable this user? Once disabled, the user
+          will no longer be able to log in.
+      disable_in_batch:
+        title: Disable
+        description: >-
+          Are you sure you want to disable the selected users? Once disabled,
+          these users will no longer be able to log in.
     filters:
       role:
         label: Role
@@ -993,6 +1211,9 @@ core:
         role:
           label: Role
           placeholder: Please select a role
+      roles_preview:
+        all: The currently selected role contains all permissions
+        includes: "The currently selected role contains the following permissions:"
     detail:
       title: User detail
       tabs:
@@ -1002,6 +1223,8 @@ core:
           title: Update profile
         change_password:
           title: Change password
+        grant_permission:
+          title: Grant permission
         profile:
           title: Profile
       fields:
@@ -1016,6 +1239,8 @@ core:
           tooltip: Verified
         email_not_verified:
           tooltip: Not verified
+    fields:
+      disabled: Disabled
   role:
     title: Roles
     common:
@@ -1060,7 +1285,6 @@ core:
         permissions: Permissions
       fields:
         display_name: Display name
-        redirect_on_login: Default redirect location after logging in
         disallow_access_console:
           label: Disable access to Console
           help: Once checked, this role will not be able to access the Console
@@ -1076,6 +1300,15 @@ core:
         title: Disable identity authentication method
       disable_privileged:
         tooltip: The authentication method reserved by the system cannot be disabled
+    fields:
+      display_name:
+        local: Login with credentials
+      description:
+        local: Default login method built into Halo
+    list:
+      types:
+        form: Basic Authentication Method
+        oauth2: Third-party Authentication Method
     detail:
       title: Identity authentication detail
       fields:
@@ -1090,6 +1323,8 @@ core:
       detail: Detail
       notification-preferences: Notification Preferences
       pat: Personal Access Tokens
+      2fa: 2FA
+      devices: Devices
     actions:
       update_profile:
         title: Update profile
@@ -1122,6 +1357,59 @@ core:
         title: Verify email
       email_verified:
         tooltip: Verified
+    2fa:
+      operations:
+        enable:
+          button: Enable 2FA
+          title: Enable 2FA
+        disable:
+          title: Disable 2FA
+        disable_totp:
+          title: Disable TOTP
+      password_validation_form:
+        fields:
+          password:
+            label: Password
+            help: Login password of the current account
+      methods:
+        title: Two-factor methods
+        totp:
+          title: TOTP
+          description: Configure two-step verification with TOTP application
+          fields:
+            status:
+              configured: Configured
+              not_configured: Not configured
+          operations:
+            reconfigure:
+              button: Reconfigure
+            configure:
+              button: Configure
+              title: TOTP configuration
+              fields:
+                code:
+                  label: Verification code
+                  help: >-
+                    6-digit verification code obtained from the validator
+                    application
+                password:
+                  label: Password
+                  help: Login password of the current account
+                qrcode:
+                  label: "Use the validator application to scan the QR code below:"
+                manual:
+                  label: >-
+                    If you can't scan the QR code, click to view the alternative
+                    steps.
+                  help: >-
+                    Manually configure the validator application with the
+                    following code:
+              tips: >-
+                Please keep your two-step verification device safe. If the
+                device is lost or damaged, you will not be able to log in. It is
+                recommended that you install the authenticator app on multiple
+                devices or keep a backup of the key in case the primary device
+                cannot be used.
     pat:
       operations:
         delete:
@@ -1220,6 +1508,31 @@ core:
       titles:
         modify: Modify email address
         verify: Verify email
+    device:
+      list:
+        fields:
+          current: Current
+          last_accessed_time: "Last accessed time: {time}"
+      detail_modal:
+        title: Login device details
+        fields:
+          os: OS
+          browser: Browser
+          creation_timestamp: Creation time
+          last_accessed_times: Last accessed time
+          last_authenticated_time: Last authenticated time
+      operations:
+        revoke:
+          title: Revoke device
+          description: >-
+            Are you sure you want to revoke this device? After revoking, this
+            device will be logged out
+        revoke_others:
+          title: Revoke all other devices
+          description: >-
+            Are you sure you want to revoke all other devices? After you revoke,
+            other devices will be logged out
+          toast_success: Login status of other devices has been revoked
   uc_notification:
     title: Notifications
     tabs:
@@ -1235,6 +1548,14 @@ core:
       delete:
         description: Are you sure you want to delete this notification?
         title: Delete
+      delete_all:
+        title: Delete all current notifications
+        description: >-
+          Are you sure you want to delete all current notifications? You cannot
+          restore them after deletion.
+      mark_all_as_read:
+        title: Mark all current notifications as read
+        description: Mark all current messages as read. Do you want to continue?
   setting:
     title: Settings
   overview:
@@ -1249,8 +1570,8 @@ core:
     fields:
       external_url: External url
       start_time: Start time
-      timezone: System Timezone
-      locale: System Locale
+      timezone: Operating system Timezone
+      locale: Operating system Locale
       version: Version
       build_time: Build time
       database: Database
@@ -1273,11 +1594,16 @@ core:
         The external access url detected is inconsistent with the current access
         url, which may cause some links to fail to redirect properly. Please
         check the external access url settings.
-      h2_warning: >-
-        H2 database is only used in development and testing environments. It is
-        not recommended to use H2 database in production environment. 
-
-        If you must use it, please back up your data on time.
+    external_url_form:
+      operations:
+        save:
+          title: Modify external url
+          description: >-
+            Modifying the external access address requires restarting the Halo
+            service. It will automatically restart after the modification is
+            completed. Do you want to continue?
+      tips:
+        restarting: Modification completed, waiting for restart...
   backup:
     title: Backup and Restore
     tabs:
@@ -1309,7 +1635,10 @@ core:
         button: Download and restore
       restore_by_backup:
         button: Restore
-        title: Restore from this backup
+        title: Restore from backup file
+        description: >-
+          After clicking OK, data will be restored from the backup file
+          {filename}.
     list:
       phases:
         pending: Pending
@@ -1324,13 +1653,13 @@ core:
           1. The restore process may last for a long time, please do not refresh
           the page during this period.
         second: >-
-          2. During the restore process, although the existing data will not be
-          cleaned up, if there is a conflict, the data will be overwritten.
+          2. Before performing the restore, all existing data will be cleared.
+          Please ensure that there is no data that needs to be retained.
         third: >-
           3. After the restore is completed, you need to restart Halo to load
           the system resources normally.
         complete: Restore completed, waiting for restart...
-      start: Start restore
+      start: I have read the above instructions, start restore
       tabs:
         local:
           label: Upload
@@ -1339,7 +1668,13 @@ core:
           fields:
             url: Remote URL
         backup:
-          label: Restore from backup
+          label: Restore from backup files
+          empty:
+            title: No backup files
+            message: >-
+              Currently no backup files are scanned. You can manually upload the
+              backup files to the backups directory of the Halo working
+              directory.
   exception:
     not_found:
       message: Page not found
@@ -1347,25 +1682,6 @@ core:
       message: Unauthorized access to this page
     actions:
       home: Back to home
-  setup:
-    title: Setup
-    operations:
-      submit:
-        button: Setup
-        toast_success: Setup successfully
-      setup_initial_data:
-        loading: Initializing data, please wait...
-    fields:
-      site_title:
-        label: Site title
-      email:
-        label: Email
-      username:
-        label: Username
-      password:
-        label: Password
-      confirm_password:
-        label: Confirm password
   rbac:
     Attachments Management: Attachments
     Attachment Manage: Attachment Manage
@@ -1440,6 +1756,10 @@ core:
     Post Author: Allows you to manage your own posts
     Post Contributor: Contributions allowed
     Post Publisher: Allow to publish own posts
+    UC Attachment Manage: Allow to manage own attachments
+    role-template-uc-attachment-manager: Allow to manage own attachments
+    Recycle My Post: Recycle My Post
+    role-template-recycle-my-post: Recycle My Post
   components:
     submit_button:
       computed_text: "{text} ({shortcut})"
@@ -1480,10 +1800,27 @@ core:
           operations:
             replace:
               button: Replace
+            transfer:
+              button: Save locally
+              tooltip: >-
+                This resource is detected as an external resource. Click this
+                button to save it to the attachment library.
+            transfer_in_batch:
+              description: >-
+                External link detected. Would you like to automatically upload
+                it to the attachment library?
       toolbox:
         attachment: Attachment
         show_hide_sidebar: Show/Hide Sidebar
       title_placeholder: Please enter the title
+      cover:
+        options:
+          add: Add Cover
+          change: Change Cover
+          upload: Upload
+          attachment: Select from attachment library
+        toast:
+          upload_failed: "Failed to upload cover image: {message}"
     global_search:
       placeholder: Enter keywords to search
       no_results: No search results
@@ -1504,8 +1841,6 @@ core:
       page_label: page
       size_label: items per page
       total_label: Total {total} items
-    social_auth_providers:
-      title: Third-party login
     app_download_alert:
       description: >-
         Themes and plugins for Halo can be downloaded at the following
@@ -1541,24 +1876,62 @@ core:
         aspect_ratio_square: Crop square
         aspect_ratio_landscape: Crop landscape (16:9)
         aspect_ratio_portrait: Crop portrait (9:16)
+    h2_warning_alert:
+      title: "Warning: H2 database in use"
+      description: >-
+        The H2 database is only suitable for development and testing
+        environments and is not recommended for use in production environments.
+        H2 is very easy to cause data file corruption due to improper operation.
+        If you must use it, please back up the data on time.
   composables:
     content_cache:
       toast_recovered: Recovered unsaved content from cache
   formkit:
+    select:
+      no_data: No data
     category_select:
       creation_label: Create {text} category
     tag_select:
       creation_label: Create {text} tag
     validation:
       trim: Please remove the leading and trailing spaces
+      password: >-
+        The password can only use uppercase and lowercase letters (A-Z, a-z),
+        numbers (0-9), and the following special characters: !{'@'}#$%^&*
     verification_form:
       no_action_defined: "{label} interface not defined"
       verify_success: "{label} successful"
       verify_failed: "{label} failed"
+    secret:
+      creation_label: Create a new secret based on the text entered
+      placeholder: Search for an existing secret or enter new content to create one
+      required_key_missing_label: The needed fields are missing, Please select and complete them
+      creation_modal:
+        title: Create secret
+      edit_modal:
+        title: Edit secret
+      list_modal:
+        title: Secrets
+      operations:
+        delete:
+          title: Delete secret
+          description: >-
+            Are you sure you want to delete this secret? Please make sure that
+            this secret is not being used anywhere, otherwise you need to reset
+            it in a specific place
+      form:
+        fields:
+          description: Description
+          string_data: String Data
+    code:
+      fullscreen:
+        exit: Exit fullscreen
+        enter: Enter fullscreen to edit
   common:
     buttons:
       save: Save
       close: Close
+      save_and_continue: Save and keep adding
       close_and_shortcut: Close (Esc)
       delete: Delete
       setting: Setting
@@ -1594,6 +1967,11 @@ core:
       modify: Modify
       access: Access
       schedule_publish: Schedule publish
+      revoke: Revoke
+      disable: Disable
+      enable: Enable
+      continue: Continue
+      retry: Retry
     radio:
       "yes": "Yes"
       "no": "No"
@@ -1626,15 +2004,22 @@ core:
       not_found: Resource not found
       server_internal_error: Internal server error
       unknown_error: Unknown error
+      disable_success: Disabled successfully
+      enable_success: Enabled successfully
     dialog:
       titles:
         tip: Tip
         warning: Warning
+        login_expired: Login expired
       descriptions:
         cannot_be_recovered: This operation is irreversible.
         editor_not_found: >-
           No editor found that matches the {raw_type} format. Please check if
           the editor plugin has been installed.
+        login_expired: >-
+          The current session has expired. Click Confirm to go to the login
+          page. Please ensure that the current content is saved. You can click
+          Cancel to manually copy any unsaved content.
     filters:
       results:
         keyword: "Keyword: {keyword}"
@@ -1659,12 +2044,18 @@ core:
       none: None
       tip: Tip
       warning: Warning
+      system_protection: System protection
+      all: All
+      detail: Detail
     tooltips:
       unpublished_content_tip: There is content that has been saved but not yet published.
       publishing: Publishing
       recovering: Recovering
     fields:
       post_count: "{count} Posts"
+    form:
+      validation:
+        slug_unique: The current slug already exists
   uc_post:
     creation_modal:
       title: Create post
@@ -1672,37 +2063,16 @@ core:
       cancel_publish:
         description: Are you sure you want to cancel publishing?
         title: Cancel publish
+      delete:
+        title: Delete post
+        description: >-
+          This action will move the post to the recycle bin, where it will be
+          managed by the site administrator.
     publish_modal:
       title: Publish post
     setting_modal:
       title: Post settings
     title: My posts
-  uc_reset_password:
-    fields:
-      username:
-        label: username
-      password:
-        label: New Password
-      password_confirm:
-        label: Confirm Password
-    operations:
-      reset:
-        button: Reset Password
-        toast_success: Reset successful
-    title: Reset password
-  reset_password:
-    fields:
-      username:
-        label: Username
-      email:
-        label: email address
-    operations:
-      send:
-        label: Send verification email
-        toast_success: >-
-          If your username and email address match, we will send an email to
-          your email address.
-    title: Reset password
   tool:
     title: Tools
     empty:

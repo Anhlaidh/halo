@@ -1,4 +1,13 @@
 editor:
+  drag:
+    button:
+      insert_block: 插入块
+      drag_handle: 按住拖动
+    menu:
+      convert_to: 转化为
+      copy: 复制
+      cut: 剪切
+      delete: 删除
   menus:
     undo: 撤销
     redo: 恢复
@@ -33,6 +42,7 @@ editor:
       placeholder: 链接地址
       open_in_new_window: 在新窗口中打开
       cancel_link: 取消链接
+      nofollow: 搜索引擎忽略链接关系
     audio:
       disable_autoplay: 关闭自动播放
       enable_autoplay: 开启自动播放
@@ -87,6 +97,8 @@ editor:
       toolbar_item:
         title: 格式刷
         cancel: 取消格式刷
+    details:
+      command_item: 折叠内容
   components:
     color_picker:
       more_color: 更多颜色
@@ -104,7 +116,10 @@ editor:
     code: 行内代码
     superscript: 上角标
     subscript: 下角标
-    codeblock: 代码块
+    codeblock:
+      title: 代码块
+      copy_code: 复制代码
+      copy_code_success: 复制成功
     image: 图片
     heading:
       title: 文本类型

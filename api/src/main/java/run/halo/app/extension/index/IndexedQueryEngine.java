@@ -1,11 +1,13 @@
 package run.halo.app.extension.index;
 
 import java.util.List;
+import org.springframework.data.domain.Sort;
 import run.halo.app.extension.GroupVersionKind;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
 import run.halo.app.extension.Metadata;
 import run.halo.app.extension.PageRequest;
+import run.halo.app.extension.ReactiveExtensionClient;
 
 /**
  * <p>An interface for querying indexed object records from the index store.</p>
@@ -15,7 +17,11 @@ import run.halo.app.extension.PageRequest;
  *
  * @author guqing
  * @since 2.12.0
+ * @deprecated Use {@link ReactiveExtensionClient#listAllNames(Class, ListOptions, Sort)}
+ * or {@link ReactiveExtensionClient#countBy(Class, ListOptions)}
+ * or {@link ReactiveExtensionClient#listTopNames(Class, ListOptions, Sort, int)} instead
  */
+@Deprecated(forRemoval = true, since = "2.22.0")
 public interface IndexedQueryEngine {
 
     /**
@@ -36,7 +42,8 @@ public interface IndexedQueryEngine {
      *
      * @param type the type of the object must exist in {@link run.halo.app.extension.SchemeManager}
      * @param options the list options to use for retrieving the object records
+     * @param sort the sort to use for retrieving the object records
      * @return a collection of {@link Metadata#getName()}
      */
-    List<String> retrieveAll(GroupVersionKind type, ListOptions options);
+    List<String> retrieveAll(GroupVersionKind type, ListOptions options, Sort sort);
 }

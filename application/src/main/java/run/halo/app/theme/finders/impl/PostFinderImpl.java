@@ -1,13 +1,17 @@
 package run.halo.app.theme.finders.impl;
 
-import static run.halo.app.extension.index.query.QueryFactory.and;
-import static run.halo.app.extension.index.query.QueryFactory.equal;
+import static run.halo.app.extension.index.query.Queries.equal;
+import static run.halo.app.extension.index.query.Queries.in;
+import static run.halo.app.extension.index.query.Queries.notEqual;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
+import lombok.Data;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.domain.Sort;
@@ -15,16 +19,22 @@ import org.springframework.lang.NonNull;
 import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import run.halo.app.content.CategoryService;
+import run.halo.app.core.extension.content.Category;
 import run.halo.app.core.extension.content.Post;
 import run.halo.app.extension.ListOptions;
 import run.halo.app.extension.ListResult;
+import run.halo.app.extension.PageRequest;
 import run.halo.app.extension.PageRequestImpl;
 import run.halo.app.extension.ReactiveExtensionClient;
 import run.halo.app.extension.exception.ExtensionNotFoundException;
-import run.halo.app.extension.index.query.QueryFactory;
+import run.halo.app.extension.index.query.Condition;
+import run.halo.app.extension.index.query.Queries;
 import run.halo.app.extension.router.selector.FieldSelector;
 import run.halo.app.extension.router.selector.LabelSelector;
 import run.halo.app.infra.utils.HaloUtils;
+import run.halo.app.infra.utils.JsonUtils;
+import run.halo.app.infra.utils.SortUtils;
 import run.halo.app.theme.finders.Finder;
 import run.halo.app.theme.finders.PostFinder;
 import run.halo.app.theme.finders.PostPublicQueryService;
@@ -52,6 +62,8 @@ public class PostFinderImpl implements PostFinder {
 
     private final ReactiveQueryPostPredicateResolver postPredicateResolver;
 
+    private final CategoryService categoryService;
+
     @Override
     public Mono<PostVo> getByName(String postName) {
         return postPredicateResolver.getPredicate()
@@ -72,7 +84,7 @@ public class PostFinderImpl implements PostFinder {
         return Sort.by(Sort.Order.desc("spec.pinned"),
             Sort.Order.desc("spec.priority"),
             Sort.Order.desc("spec.publishTime"),
-            Sort.Order.desc("metadata.name")
+            Sort.Order.asc("metadata.name")
         );
     }
 
@@ -106,13 +118,18 @@ public class PostFinderImpl implements PostFinder {
 
     @Override
     public Mono<NavigationPostVo> cursor(String currentName) {
+        // TODO Refine this feature
         return postPredicateResolver.getListOptions()
-            .flatMap(postListOption -> {
-                var postNames = client.indexedQueryEngine()
-                    .retrieve(Post.GVK, postListOption,
-                        PageRequestImpl.ofSize(0).withSort(defaultSort())
-                    )
-                    .getItems();
+            .map(listOptions -> ListOptions.builder(listOptions)
+                // Exclude hidden posts
+                .andQuery(notHiddenPostQuery())
+                .build()
+            )
+            .flatMap(listOptions -> client.listNamesBy(Post.class, listOptions,
+                PageRequestImpl.ofSize(1).withSort(defaultSort()))
+            )
+            .flatMap(listResult -> {
+                var postNames = listResult.getItems();
                 var previousNextPair = findPostNavigation(postNames, currentName);
                 String previousPostName = previousNextPair.prev();
                 String nextPostName = previousNextPair.next();
@@ -129,9 +146,35 @@ public class PostFinderImpl implements PostFinder {
             .defaultIfEmpty(NavigationPostVo.empty());
     }
 
+    private static Condition notHiddenPostQuery() {
+        return notEqual("status.hideFromList", BooleanUtils.TRUE);
+    }
+
+    @Override
+    public Mono<ListResult<ListedPostVo>> list(Map<String, Object> params) {
+        var query = Optional.ofNullable(params)
+            .map(map -> JsonUtils.mapToObject(map, PostQuery.class))
+            .orElseGet(PostQuery::new);
+        if (StringUtils.isNotBlank(query.getCategoryName())) {
+            return listChildrenCategories(query.getCategoryName())
+                .map(category -> category.getMetadata().getName())
+                .collectList()
+                .map(categoryNames -> ListOptions.builder(query.toListOptions())
+                    .andQuery(in("spec.categories", categoryNames))
+                    .build()
+                )
+                .flatMap(
+                    listOptions -> postPublicQueryService.list(listOptions, query.toPageRequest()));
+        }
+        return postPublicQueryService.list(query.toListOptions(), query.toPageRequest());
+    }
+
     @Override
     public Mono<ListResult<ListedPostVo>> list(Integer page, Integer size) {
-        return postPublicQueryService.list(new ListOptions(), getPageRequest(page, size));
+        var listOptions = ListOptions.builder()
+            .fieldQuery(notHiddenPostQuery())
+            .build();
+        return postPublicQueryService.list(listOptions, getPageRequest(page, size));
     }
 
     private PageRequestImpl getPageRequest(Integer page, Integer size) {
@@ -141,20 +184,31 @@ public class PostFinderImpl implements PostFinder {
     @Override
     public Mono<ListResult<ListedPostVo>> listByCategory(Integer page, Integer size,
         String categoryName) {
-        var fieldQuery = QueryFactory.all();
-        if (StringUtils.isNotBlank(categoryName)) {
-            fieldQuery = and(fieldQuery, equal("spec.categories", categoryName));
+        return listChildrenCategories(categoryName)
+            .map(category -> category.getMetadata().getName())
+            .collectList()
+            .flatMap(categoryNames -> {
+                var listOptions = new ListOptions();
+                var fieldQuery = in("spec.categories", categoryNames);
+                listOptions.setFieldSelector(FieldSelector.of(fieldQuery));
+                return postPublicQueryService.list(listOptions, getPageRequest(page, size));
+            });
+    }
+
+    private Flux<Category> listChildrenCategories(String categoryName) {
+        if (StringUtils.isBlank(categoryName)) {
+            return client.listAll(Category.class, new ListOptions(),
+                Sort.by(Sort.Order.asc("metadata.creationTimestamp"),
+                    Sort.Order.desc("metadata.name")));
         }
-        var listOptions = new ListOptions();
-        listOptions.setFieldSelector(FieldSelector.of(fieldQuery));
-        return postPublicQueryService.list(listOptions, getPageRequest(page, size));
+        return categoryService.listChildren(categoryName);
     }
 
     @Override
     public Mono<ListResult<ListedPostVo>> listByTag(Integer page, Integer size, String tag) {
-        var fieldQuery = QueryFactory.all();
+        var fieldQuery = Queries.empty();
         if (StringUtils.isNotBlank(tag)) {
-            fieldQuery = and(fieldQuery, equal("spec.tags", tag));
+            fieldQuery = fieldQuery.and(equal("spec.tags", tag));
         }
         var listOptions = new ListOptions();
         listOptions.setFieldSelector(FieldSelector.of(fieldQuery));
@@ -163,9 +217,9 @@ public class PostFinderImpl implements PostFinder {
 
     @Override
     public Mono<ListResult<ListedPostVo>> listByOwner(Integer page, Integer size, String owner) {
-        var fieldQuery = QueryFactory.all();
+        var fieldQuery = Queries.empty();
         if (StringUtils.isNotBlank(owner)) {
-            fieldQuery = and(fieldQuery, equal("spec.owner", owner));
+            fieldQuery = fieldQuery.and(equal("spec.owner", owner));
         }
         var listOptions = new ListOptions();
         listOptions.setFieldSelector(FieldSelector.of(fieldQuery));
@@ -186,6 +240,7 @@ public class PostFinderImpl implements PostFinder {
     public Mono<ListResult<PostArchiveVo>> archives(Integer page, Integer size, String year,
         String month) {
         var listOptions = new ListOptions();
+        listOptions.setFieldSelector(FieldSelector.of(notHiddenPostQuery()));
         var labelSelectorBuilder = LabelSelector.builder();
         if (StringUtils.isNotBlank(year)) {
             labelSelectorBuilder.eq(Post.ARCHIVE_YEAR_LABEL, year);
@@ -235,17 +290,52 @@ public class PostFinderImpl implements PostFinder {
     public Flux<ListedPostVo> listAll() {
         return postPredicateResolver.getListOptions()
             .flatMapMany(listOptions -> client.listAll(Post.class, listOptions, defaultSort()))
-            .concatMap(postPublicQueryService::convertToListedVo);
+            .collectList()
+            .flatMap(postPublicQueryService::convertToListedVos)
+            .flatMapMany(Flux::fromIterable);
     }
 
-    int pageNullSafe(Integer page) {
+    static int pageNullSafe(Integer page) {
         return ObjectUtils.defaultIfNull(page, 1);
     }
 
-    int sizeNullSafe(Integer size) {
+    static int sizeNullSafe(Integer size) {
         return ObjectUtils.defaultIfNull(size, 10);
     }
 
     record LinkNavigation(String prev, String current, String next) {
+    }
+
+    @Data
+    public static class PostQuery {
+        private Integer page;
+        private Integer size;
+        private String categoryName;
+        private String tagName;
+        private String owner;
+        private List<String> sort;
+
+        public ListOptions toListOptions() {
+            var builder = ListOptions.builder();
+            var hasQuery = false;
+            if (StringUtils.isNotBlank(owner)) {
+                builder.andQuery(equal("spec.owner", owner));
+                hasQuery = true;
+            }
+            if (StringUtils.isNotBlank(tagName)) {
+                builder.andQuery(equal("spec.tags", tagName));
+                hasQuery = true;
+            }
+            // Exclude hidden posts when no query
+            if (!hasQuery) {
+                builder.fieldQuery(notHiddenPostQuery());
+            }
+            return builder.build();
+        }
+
+        public PageRequest toPageRequest() {
+            return PageRequestImpl.of(pageNullSafe(getPage()),
+                sizeNullSafe(getSize()), SortUtils.resolve(sort).and(defaultSort()));
+        }
     }
 }

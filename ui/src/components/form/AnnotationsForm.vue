@@ -1,21 +1,19 @@
 <script lang="ts" setup>
+import { useThemeStore } from "@console/stores/theme";
 import {
-  type FormKitNode,
-  type FormKitSchemaCondition,
-  type FormKitSchemaNode,
   reset,
   submitForm,
+  type FormKitNode,
+  type FormKitSchemaDefinition,
+  type FormKitSchemaNode,
 } from "@formkit/core";
-
-import { IconArrowRight } from "@halo-dev/components";
-
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { apiClient } from "@/utils/api-client";
-import type { AnnotationSetting } from "@halo-dev/api-client";
-import { cloneDeep } from "lodash-es";
 import { getValidationMessages } from "@formkit/validation";
-import { useThemeStore } from "@console/stores/theme";
-import { randomUUID } from "@/utils/id";
+import type { AnnotationSetting } from "@halo-dev/api-client";
+import { coreApiClient } from "@halo-dev/api-client";
+import { IconArrowRight } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
+import { cloneDeep } from "es-toolkit";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 
 const themeStore = useThemeStore();
 
@@ -58,31 +56,32 @@ const avaliableAnnotationSettings = computed(() => {
 const handleFetchAnnotationSettings = async () => {
   try {
     const { data } =
-      await apiClient.extension.annotationSetting.listV1alpha1AnnotationSetting(
-        {
-          labelSelector: [
-            `halo.run/target-ref=${[props.group, props.kind].join("/")}`,
-          ],
-        }
-      );
+      await coreApiClient.annotationSetting.listAnnotationSetting({
+        labelSelector: [
+          `halo.run/target-ref=${[props.group, props.kind].join("/")}`,
+        ],
+      });
     annotationSettings.value = data.items;
   } catch (error) {
     console.error("Failed to fetch annotation settings", error);
   }
 };
 
-const specFormId = `${randomUUID()}-specForm`;
-const customFormId = `${randomUUID()}-customForm`;
+const specFormId = `${utils.id.uuid()}-specForm`;
+const customFormId = `${utils.id.uuid()}-customForm`;
 const annotations = ref<{
   [key: string]: string;
 }>({});
 const customAnnotationsState = ref<{ key: string; value: string }[]>([]);
 
 const customAnnotations = computed(() => {
-  return customAnnotationsState.value.reduce((acc, cur) => {
-    acc[cur.key] = cur.value;
-    return acc;
-  }, {} as { [key: string]: string });
+  return customAnnotationsState.value.reduce(
+    (acc, cur) => {
+      acc[cur.key] = cur.value;
+      return acc;
+    },
+    {} as { [key: string]: string }
+  );
 });
 
 const handleProcessCustomAnnotations = () => {
@@ -135,12 +134,15 @@ const handleProcessCustomAnnotations = () => {
       }
     })
     .filter(Boolean)
-    .reduce((acc, cur) => {
-      if (cur) {
-        acc[cur.key] = cur.value;
-      }
-      return acc;
-    }, {} as { [key: string]: string });
+    .reduce(
+      (acc, cur) => {
+        if (cur) {
+          acc[cur.key] = cur.value;
+        }
+        return acc;
+      },
+      {} as { [key: string]: string }
+    );
 };
 
 onMounted(async () => {
@@ -224,14 +226,17 @@ function onCustomFormToggle(e: Event) {
         <FormKitSchema
           v-if="annotationSetting.spec?.formSchema"
           :key="index"
-          :schema="annotationSetting.spec?.formSchema as (FormKitSchemaCondition| FormKitSchemaNode[])"
+          :schema="
+            annotationSetting.spec?.formSchema as FormKitSchemaDefinition
+          "
         />
       </template>
     </FormKit>
 
+    <!-- @vue-ignore -->
     <details
       :open="showCustomForm"
-      class="flex cursor-pointer space-y-4 py-4 transition-all first:pt-0"
+      class="flex cursor-pointer flex-col space-y-4 py-4 transition-all first:pt-0"
       @toggle="onCustomFormToggle"
     >
       <summary class="group flex items-center justify-between">

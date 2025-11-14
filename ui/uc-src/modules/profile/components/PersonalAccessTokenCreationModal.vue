@@ -1,17 +1,17 @@
 <script lang="ts" setup>
 import SubmitButton from "@/components/button/SubmitButton.vue";
+import { useRoleTemplateSelection } from "@/composables/use-role";
 import { patAnnotations, rbacAnnotations } from "@/constants/annotations";
-import { apiClient } from "@/utils/api-client";
-import { toISOString } from "@/utils/date";
+import { roleLabels } from "@/constants/labels";
+import { useRoleStore } from "@/stores/role";
+import type { PatSpec, PersonalAccessToken } from "@halo-dev/api-client";
+import { ucApiClient } from "@halo-dev/api-client";
 import { Dialog, Toast, VButton, VModal, VSpace } from "@halo-dev/components";
+import { utils } from "@halo-dev/ui-shared";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { useClipboard } from "@vueuse/core";
-import type { PatSpec, PersonalAccessToken } from "@halo-dev/api-client";
 import { computed, ref } from "vue";
-import { useRoleTemplateSelection } from "@/composables/use-role";
-import { useRoleStore } from "@/stores/role";
 import { useI18n } from "vue-i18n";
-import { roleLabels } from "@/constants/labels";
 
 const queryClient = useQueryClient();
 const { t } = useI18n();
@@ -65,7 +65,7 @@ const { mutate, isLoading } = useMutation({
   mutationKey: ["pat-creation"],
   mutationFn: async () => {
     if (formState.value.spec?.expiresAt) {
-      formState.value.spec.expiresAt = toISOString(
+      formState.value.spec.expiresAt = utils.date.toISOString(
         formState.value.spec.expiresAt
       );
     }
@@ -73,9 +73,11 @@ const { mutate, isLoading } = useMutation({
       ...formState.value.spec,
       roles: Array.from(selectedRoleTemplates.value),
     };
-    const { data } = await apiClient.pat.generatePat({
-      personalAccessToken: formState.value,
-    });
+    const { data } = await ucApiClient.security.personalAccessToken.generatePat(
+      {
+        personalAccessToken: formState.value,
+      }
+    );
     return data;
   },
   onSuccess(data) {
@@ -118,6 +120,7 @@ const { mutate, isLoading } = useMutation({
           </div>
         </div>
         <div class="mt-5 divide-y divide-gray-100 md:col-span-3 md:mt-0">
+          <!-- @vue-ignore -->
           <FormKit
             id="pat-creation-form"
             v-model="formState.spec"
